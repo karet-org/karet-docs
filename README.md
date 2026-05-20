@@ -1,5 +1,7 @@
 # karet-docs
 
+[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare%20Pages-deployed-orange?logo=cloudflare)](https://karet.joeyshi.xyz)
+
 VitePress documentation site for Karet.
 
 ```sh
