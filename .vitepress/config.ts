@@ -12,7 +12,7 @@ export default defineConfig({
   // point at the dev server the reader is supposed to run.
   ignoreDeadLinks: [/^https?:\/\/localhost/],
   themeConfig: {
-    siteTitle: "Karet docs",
+    siteTitle: "Karet",
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Reference", link: "/reference/pipeline-config" },
