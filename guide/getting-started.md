@@ -4,7 +4,7 @@ Run the full Karet stack on your machine in under five minutes.
 
 ## Prerequisites
 
-- [Finch](https://runfinch.com/) or [Docker](https://www.docker.com/), or anything else that speaks `docker compose`.
+- [Docker](https://www.docker.com/) with the Compose plugin (`docker compose`).
 - About 1 GB of disk for the bundled S3 emulator and clean Parquet output.
 
 ## 1. Clone and configure
@@ -23,8 +23,7 @@ deliberate. Running with a default value would let anyone forge a session.
 ## 2. Start the stack
 
 ```sh
-finch compose up -d
-# or: docker compose up -d
+docker compose up -d
 ```
 
 Three services come up:

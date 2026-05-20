@@ -43,7 +43,7 @@ a `?secret=` query param) and `karet` (which verifies it).
 ### 2. Restart the stack
 
 ```sh
-finch compose up -d --force-recreate
+docker compose up -d --force-recreate
 ```
 
 This picks up the new env vars.

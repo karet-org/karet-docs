@@ -29,7 +29,7 @@ Rotate the secret to invalidate every session:
 
 ```sh
 sed -i '' 's/^KARET_SESSION_SECRET=.*/KARET_SESSION_SECRET=$(openssl rand -base64 48)/' .env
-finch compose up -d --force-recreate web
+docker compose up -d --force-recreate web
 ```
 
 ## Changing the password
