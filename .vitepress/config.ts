@@ -16,7 +16,6 @@ export default defineConfig({
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Reference", link: "/reference/pipeline-config" },
-      { text: "GitHub", link: "https://github.com/joeyshi12/karet" },
     ],
     sidebar: {
       "/guide/": [
@@ -45,13 +44,13 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: "github", link: "https://github.com/joeyshi12/karet" },
+      { icon: "github", link: "https://github.com/joeyshi12/karet-org" },
     ],
     search: {
       provider: "local",
     },
     editLink: {
-      pattern: "https://github.com/joeyshi12/karet/edit/main/src/karet-docs/:path",
+      pattern: "https://github.com/joeyshi12/karet-org/edit/main/src/karet-docs/:path",
       text: "Edit this page on GitHub",
     },
     footer: {
