@@ -44,13 +44,13 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: "github", link: "https://github.com/joeyshi12/karet-org" },
+      { icon: "github", link: "https://github.com/karet-org/karet" },
     ],
     search: {
       provider: "local",
     },
     editLink: {
-      pattern: "https://github.com/joeyshi12/karet-org/edit/main/src/karet-docs/:path",
+      pattern: "https://github.com/karet-org/karet-docs/edit/main/:path",
       text: "Edit this page on GitHub",
     },
     footer: {
