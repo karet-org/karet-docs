@@ -19,7 +19,7 @@ features:
   - title: JSON-driven dashboards
     details: Panels, layouts, aggregations, and chart aspect ratios all live in S3. Edit the config, the page updates.
   - title: Auto-runs on upload
-    details: Drop a CSV into the bucket and a webhook kicks off a debounced pipeline run. No cron, no manual trigger.
+    details: Drop a CSV into the bucket and a webhook kicks off a debounced pipeline run.
   - title: Single-admin auth
     details: Password-only login, scrypt-hashed at OWASP cost. No user table to manage.
 ---

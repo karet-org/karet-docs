@@ -1,9 +1,7 @@
 # Self-hosting
 
-The fastest way to run Karet on your own hardware is to pull the
-prebuilt container images from GitHub Container Registry. No source
-checkout, no Rust toolchain, no Node install. About 90 seconds from
-nothing to a running instance.
+To run Karet on your own hardware, pull the prebuilt container images
+from GitHub Container Registry and start them with Docker Compose.
 
 ## Prerequisites
 

@@ -7,9 +7,9 @@ bundle of files that get copied under `pipelines/<slug>/` in S3.
 
 ### Blank
 
-The simplest possible config: no source containers, no mappings, no
-analytic tables, no dashboards. Useful when you want to assemble everything
-yourself in the graph editor.
+An empty config with no source containers, mappings, analytic tables,
+or dashboards. Useful when you want to assemble everything yourself in
+the graph editor.
 
 ### Spending Tracker
 
