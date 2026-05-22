@@ -208,7 +208,7 @@ Same shape, but:
 ### Services
 
 - `karet-svc`: desired count 2, target group on the ALB (port 3000), health check path `/`.
-- `karet-worker-svc`: desired count 1–2, no ALB needed for the UI path, but register it with **AWS Cloud Map** (`karet-worker.karet.local`) so `karet` can reach it by name. For the S3 webhook, expose it on an **internal ALB** with listener on 8080 and target path `/webhooks/s3/on-upload`.
+- `karet-worker-svc`: desired count 1-2, no ALB needed for the UI path, but register it with **AWS Cloud Map** (`karet-worker.karet.local`) so `karet` can reach it by name. For the S3 webhook, expose it on an **internal ALB** with listener on 8080 and target path `/webhooks/s3/on-upload`.
 
 ---
 
@@ -288,7 +288,7 @@ Rough monthly estimate for a small prod deployment in `us-east-1`:
 | NAT gateway | 1 AZ | ~35 |
 | CloudWatch Logs | 5 GB ingest | ~3 |
 
-Total is roughly **$100–120/mo** before data transfer. Replacing NAT with VPC endpoints cuts it further.
+Total is roughly **$100-120/mo** before data transfer. Replacing NAT with VPC endpoints cuts it further.
 
 ---
 

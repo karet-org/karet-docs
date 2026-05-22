@@ -38,9 +38,6 @@ ones below.
 | `GET /api/p/[pipeline]/tables/[table]/rows` | Stream the table's rows (parses every Parquet file under the prefix). |
 | `GET /api/p/[pipeline]/jobs` | Job history with orphan reconciliation (`running` jobs older than 10 min get marked `failed`). |
 | `POST /api/p/[pipeline]/jobs?clean=true` | Trigger a manual run. Returns the initial `running` record immediately; the worker call happens in the background. |
-| `GET /api/p/[pipeline]/preview` | Dashboard thumbnail (PNG). Returns a 1×1 transparent fallback if missing. |
-| `PUT /api/p/[pipeline]/preview` | Upload a thumbnail PNG. Used by the graph page's auto-capture. |
-| `HEAD /api/p/[pipeline]/preview` | 200 if a real thumbnail exists, 404 otherwise. |
 | `GET /api/p/[pipeline]/export` | Stream a `.zip` of every object under the slug. |
 
 ## Webhooks

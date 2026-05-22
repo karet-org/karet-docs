@@ -2,6 +2,12 @@
 
 Run the full Karet stack on your machine in under five minutes.
 
+::: tip Just want to self-host?
+This guide builds from source so you can poke at the code. If you
+just want a running instance, the [self-hosting guide](./self-hosting)
+uses prebuilt images from GHCR and skips the source checkout.
+:::
+
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) with the Compose plugin (`docker compose`).
@@ -10,7 +16,7 @@ Run the full Karet stack on your machine in under five minutes.
 ## 1. Clone and configure
 
 ```sh
-git clone https://github.com/joeyshi12/karet
+git clone https://github.com/karet-org/karet
 cd karet
 
 # Generate a secret used to sign session cookies.

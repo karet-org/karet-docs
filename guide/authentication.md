@@ -21,9 +21,9 @@ attacker who finds it open can't use it to seed a backdoor account.
 ## Sessions
 
 The session cookie is **HMAC-signed** with `KARET_SESSION_SECRET`. The
-payload is `{ u: "", exp: <unix-seconds> }`. Karet doesn't need a
-username, but the field is kept so older multi-user cookies still
-validate. Sessions last 7 days.
+payload is `{ exp: <unix-seconds> }` -- Karet is single-admin, so
+possession of a valid HMAC over a fresh `exp` is the entire authorization
+signal. Sessions last 7 days.
 
 Rotate the secret to invalidate every session:
 
@@ -54,23 +54,9 @@ echo "KARET_API_KEY=$(openssl rand -hex 32)" >> .env
 The middleware accepts requests bearing the matching value in either
 `X-API-Key` or `Authorization: Bearer <key>`. Empty disables the feature.
 
-## Migration from the old multi-user shape
-
-Older Karet installs wrote `_auth/users.json` with an array of users.
-On the next auth-touching request, the new code:
-
-1. Reads the legacy file.
-2. Takes the first user's `password_hash` and `created_at`.
-3. Writes them to `_auth/admin.json`.
-4. Returns the migrated record.
-
-The legacy file is left in place. Delete it manually once you've
-confirmed the migration succeeded.
-
 ## What's stored where
 
 | Path | Contents |
 |------|----------|
 | `_auth/admin.json` | The admin record: scrypt hash + created-at timestamp. |
-| `_auth/users.json` | Legacy file from the multi-user era. Read once on migration; safe to delete after. |
 | Session cookie `karet_session` | `<base64url(payload)>.<base64url(hmacSHA256(payload))>`. HttpOnly, SameSite=Lax. |

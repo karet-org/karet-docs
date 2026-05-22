@@ -11,7 +11,13 @@ export default defineConfig({
   // Doc references like http://localhost:3000 are intentional. They
   // point at the dev server the reader is supposed to run.
   ignoreDeadLinks: [/^https?:\/\/localhost/],
+  // Carrot-mark favicon (matches the web app's nav logo and keeps the
+  // docs site and the running instance feeling like one product).
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
+  ],
   themeConfig: {
+    logo: "/favicon.svg",
     siteTitle: "Karet",
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
@@ -23,6 +29,7 @@ export default defineConfig({
           text: "Guide",
           items: [
             { text: "Getting started", link: "/guide/getting-started" },
+            { text: "Self-hosting", link: "/guide/self-hosting" },
             { text: "Architecture", link: "/guide/architecture" },
             { text: "Templates", link: "/guide/templates" },
             { text: "Auto-runs (webhooks)", link: "/guide/webhooks" },
