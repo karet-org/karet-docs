@@ -172,7 +172,7 @@ Create an ECS cluster, then one task definition + service per container.
       { "name": "PORT",                "value": "8080" },
       { "name": "S3_BUCKET",           "value": "karet-data-<ACCOUNT_ID>" },
       { "name": "AWS_REGION",          "value": "<REGION>" },
-      { "name": "PIPELINE_CONFIG_KEY", "value": "config/pipeline.json" },
+      { "name": "AWS_ENDPOINT_URL",    "value": "https://s3.<REGION>.amazonaws.com" },
       { "name": "POLARS_MAX_THREADS",  "value": "2" }
     ],
     "healthCheck": {
@@ -192,7 +192,7 @@ Create an ECS cluster, then one task definition + service per container.
 ```
 
 Notes:
-- **Do not set** `S3_ENDPOINT` or `AWS_ENDPOINT_URL` in prod. The AWS SDK hits real S3 by default.
+- The worker (and web) requires `AWS_ENDPOINT_URL`. In prod, set it to the regional S3 endpoint (`https://s3.<REGION>.amazonaws.com`); locally it points at rustfs.
 - **Do not set** `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Credentials come from the task role.
 
 ### karet task definition
@@ -201,8 +201,8 @@ Same shape, but:
 - image: `karet:latest`
 - container port `3000`
 - task role: `karet-task-role`
-- extra env:
-  - `KARET_API_KEY`: pull from **Secrets Manager** via the `secrets` field, not `environment`.
+- env (same `S3_BUCKET` / `AWS_REGION` / `AWS_ENDPOINT_URL` / `POLARS_MAX_THREADS` shape, minus the worker-only thread var):
+  - `KARET_SESSION_SECRET`: pull from **Secrets Manager** via the `secrets` field, not `environment`.
   - add an internal URL for the worker if web-side code needs it (e.g. `WORKER_URL=http://karet-worker.karet.local:8080` using ECS Service Discovery).
 
 ### Services
@@ -242,8 +242,9 @@ Option B: **SQS queue** (more resilient; survives worker restarts):
 
 ## 9. Secrets and configuration
 
-- `KARET_API_KEY`: store in **AWS Secrets Manager** (`/karet/prod/api-key`), reference from the task definition's `secrets` block.
-- `Pipeline_Config`: lives in S3 at `config/pipeline.json`. Update it by re-uploading the file. Both services re-read it on demand.
+- `KARET_SESSION_SECRET`: store in **AWS Secrets Manager** (`/karet/prod/session-secret`), reference from the task definition's `secrets` block. Generate with `openssl rand -base64 48`.
+- `KARET_WEBHOOK_SECRET`: same pattern. Required only if the bucket is wired up for object-event notifications that should trigger pipeline runs.
+- Pipeline configs live in S3 at `pipelines/<slug>/pipeline.json`. Update them by re-uploading; the web service reads them on demand.
 - Database creds, API tokens, etc.: always Secrets Manager or SSM Parameter Store, never task `environment`.
 
 ---
@@ -297,8 +298,8 @@ Total is roughly **$100-120/mo** before data transfer. Replacing NAT with VPC en
 Before flipping prod traffic:
 
 - [ ] Task roles replace the static `AWS_*` keys from `docker-compose.yaml`.
-- [ ] `S3_ENDPOINT` / `AWS_ENDPOINT_URL` are **unset** in prod.
-- [ ] `KARET_API_KEY` is set (and non-empty) so `/api/*` isn't open.
+- [ ] `AWS_ENDPOINT_URL` on both services is set to `https://s3.<REGION>.amazonaws.com`.
+- [ ] `KARET_SESSION_SECRET` is sourced from Secrets Manager.
 - [ ] Bucket has versioning + public access block on.
 - [ ] `/health` returns 200 from the worker task behind its target group.
 - [ ] ALB listener has ACM cert and redirects 80 → 443.

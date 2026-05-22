@@ -42,17 +42,15 @@ The endpoint runs `verifyPassword` against the stored hash even when the
 account file is missing or unreadable, so timing doesn't leak whether
 an admin exists.
 
-## CI / automation: API keys
+## CI / automation
 
-If you have a script that needs to call `/api/*` without going through
-the cookie flow, set `KARET_API_KEY` to a shared secret:
-
-```sh
-echo "KARET_API_KEY=$(openssl rand -hex 32)" >> .env
-```
-
-The middleware accepts requests bearing the matching value in either
-`X-API-Key` or `Authorization: Bearer <key>`. Empty disables the feature.
+There is no machine-readable HTTP API for Karet. The endpoints under
+`/api/*` exist solely to back the browser UI and are not a public
+contract -- they require a session cookie. For automation, talk
+directly to the S3 store: pipelines, dashboards, and jobs all live as
+JSON / Parquet objects under `pipelines/<slug>/`. The
+[`karet-skills`](https://github.com/karet-org/karet/tree/main/src/karet-skills)
+package shows the layout.
 
 ## What's stored where
 

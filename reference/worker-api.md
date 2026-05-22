@@ -76,6 +76,7 @@ the same error shape as `/config/validate`.
 | Variable | Purpose |
 |----------|---------|
 | `S3_BUCKET` | Bucket name. |
-| `S3_ENDPOINT` / `AWS_ENDPOINT_URL` | S3 endpoint URL. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | S3 credentials. |
-| `PORT` | HTTP listen port (default `8080`). |
+| `AWS_ENDPOINT_URL` | S3 endpoint URL (e.g. `http://rustfs:9000` for local dev, `https://s3.<region>.amazonaws.com` for real AWS). |
+| `PORT` | Optional HTTP listen port (default `8080`). |
+| `POLARS_MAX_THREADS` | Optional cap on the Polars thread pool. |

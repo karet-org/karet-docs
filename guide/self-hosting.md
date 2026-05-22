@@ -59,8 +59,7 @@ services:
     environment:
       PORT: "8080"
       S3_BUCKET: ${S3_BUCKET:-karet-data}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
-      AWS_ENDPOINT_URL: ${S3_ENDPOINT:-http://rustfs:9000}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://rustfs:9000}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-rustfsadmin}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-rustfsadmin}
       AWS_REGION: ${AWS_REGION:-us-east-1}
@@ -75,16 +74,15 @@ services:
       - "3000:3000"
     environment:
       PORT: "3000"
-      HOSTNAME: 0.0.0.0
       S3_BUCKET: ${S3_BUCKET:-karet-data}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://rustfs:9000}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://rustfs:9000}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-rustfsadmin}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-rustfsadmin}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       S3_FORCE_PATH_STYLE: "true"
       KARET_SESSION_SECRET: ${KARET_SESSION_SECRET:?set KARET_SESSION_SECRET (e.g. openssl rand -base64 48)}
-      KARET_API_KEY: ${KARET_API_KEY:-}
       KARET_WEBHOOK_SECRET: ${KARET_WEBHOOK_SECRET:-}
+      NEXT_PUBLIC_S3_CONSOLE_URL: ${NEXT_PUBLIC_S3_CONSOLE_URL:-http://localhost:9001}
     depends_on:
       - rustfs
       - worker
@@ -106,18 +104,15 @@ who guessed the default would forge a session). Drop it in a
 echo "KARET_SESSION_SECRET=$(openssl rand -base64 48)" > .env
 ```
 
-You can optionally add the two other secrets while you're at it:
+You can optionally add the webhook secret while you're at it:
 
 ```sh
 echo "KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)" >> .env
-echo "KARET_API_KEY=$(openssl rand -hex 32)" >> .env
 ```
 
-Both are off by default. `KARET_WEBHOOK_SECRET` enables the auto-run
-webhook receiver; without it, RustFS upload events are ignored. See
-[Auto-runs](./webhooks). `KARET_API_KEY` lets non-browser clients
-(`curl`, scripts, the `karet-skills` family) call the API; without it,
-only the cookie-authenticated UI flow works.
+It's off by default. Setting it enables the auto-run webhook
+receiver; without it, RustFS upload events are ignored. See
+[Auto-runs](./webhooks).
 
 ## 3. Start the stack
 
@@ -151,13 +146,13 @@ shared.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `S3_BUCKET` | `karet-data` | S3 bucket the worker reads from and writes to. |
-| `S3_ENDPOINT` | `http://rustfs:9000` | S3 endpoint URL. Set to a real AWS endpoint to swap out RustFS. |
+| `AWS_ENDPOINT_URL` | `http://rustfs:9000` | S3 endpoint URL. Set to `https://s3.<region>.amazonaws.com` to swap out RustFS for real AWS. |
 | `AWS_ACCESS_KEY_ID` | `rustfsadmin` | S3 access key. |
 | `AWS_SECRET_ACCESS_KEY` | `rustfsadmin` | S3 secret key. |
 | `AWS_REGION` | `us-east-1` | AWS region. |
 | `KARET_SESSION_SECRET` | *(required)* | HMAC key for signing user session cookies. |
-| `KARET_API_KEY` | *(empty)* | Shared-secret auth for `/api/*`. Empty disables it. |
 | `KARET_WEBHOOK_SECRET` | *(empty)* | Shared secret enforced by `/api/events/s3`. Empty disables the webhook receiver. |
+| `NEXT_PUBLIC_S3_CONSOLE_URL` | `http://localhost:9001` | If set, the UI shows a Settings &rarr; S3 console link pointing at this URL. Empty hides the link entirely (recommended for AWS deployments). |
 
 ## Upgrading
 
@@ -180,8 +175,8 @@ For deployments backed by real AWS S3 instead of RustFS, drop the
 `rustfs` service from the compose file and point the other two at
 your bucket:
 
-- Remove `S3_ENDPOINT` (and `AWS_ENDPOINT_URL` on the worker) so the
-  AWS SDK hits real S3.
+- Set `AWS_ENDPOINT_URL` to the regional S3 endpoint
+  (`https://s3.<region>.amazonaws.com`) on both services.
 - Set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
   `AWS_REGION` to credentials that can read/write the bucket.
 - Set `S3_BUCKET` to your bucket name.
@@ -198,4 +193,4 @@ see [Deploying to AWS](./deploy-aws).
 - [Architecture](./architecture) -- the three services and how they
   talk to each other.
 - [Authentication](./authentication) -- single-admin flow, password
-  rotation, optional API-key auth for automation.
+  rotation, and notes on machine access.

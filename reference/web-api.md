@@ -1,8 +1,14 @@
 # Web HTTP API
 
 The web service (`karet`) hosts both the UI and the JSON API the UI
-talks to. Every `/api/*` route enforces auth except the explicitly-public
-ones below.
+talks to. The `/api/*` routes exist solely to back the browser UI and
+require a session cookie -- they are not a stable public surface and
+not intended for scripting. For machine-driven workflows, talk
+directly to the S3 store: pipelines, dashboards, and jobs all live as
+JSON / Parquet objects under `pipelines/<slug>/`.
+
+Every `/api/*` route enforces auth except the explicitly-public ones
+below.
 
 ## Auth
 
@@ -46,12 +52,10 @@ ones below.
 |----------|------|---------|
 | `POST /api/events/s3` | shared secret | RustFS S3-event receiver. See [Auto-runs](/guide/webhooks). |
 
-## Auth shapes
+## Auth shape
 
-The middleware (`middleware.ts`) accepts requests authenticated via:
-
-1. The `karet_session` cookie set by `/api/auth/login` or `/api/auth/setup`.
-2. `KARET_API_KEY` in either `X-API-Key` or `Authorization: Bearer <key>`.
+The middleware (`middleware.ts`) accepts requests authenticated by the
+`karet_session` cookie set by `/api/auth/login` or `/api/auth/setup`.
 
 `/api/auth/*` and `/api/events/*` bypass the middleware and handle
 their own auth: the auth routes are public, and the events route checks
@@ -69,7 +73,7 @@ Common codes:
 
 | Code | Meaning |
 |------|---------|
-| `unauthorized` | Missing/invalid session or API key. |
+| `unauthorized` | Missing/invalid session cookie. |
 | `bucket_not_found` | The S3 bucket doesn't exist. Most-common cause: S3_BUCKET mistype. |
 | `s3_error` | Catch-all for everything else from the S3 SDK. |
 | `pipeline_config_not_found` | The slug exists but its `pipeline.json` is missing. |
