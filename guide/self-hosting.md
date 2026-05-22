@@ -82,7 +82,7 @@ services:
       S3_FORCE_PATH_STYLE: "true"
       KARET_SESSION_SECRET: ${KARET_SESSION_SECRET:?set KARET_SESSION_SECRET (e.g. openssl rand -base64 48)}
       KARET_WEBHOOK_SECRET: ${KARET_WEBHOOK_SECRET:-}
-      NEXT_PUBLIC_S3_CONSOLE_URL: ${NEXT_PUBLIC_S3_CONSOLE_URL:-http://localhost:9001}
+      S3_CONSOLE_URL: ${S3_CONSOLE_URL:-http://localhost:9001}
     depends_on:
       - rustfs
       - worker
@@ -152,7 +152,7 @@ shared.
 | `AWS_REGION` | `us-east-1` | AWS region. |
 | `KARET_SESSION_SECRET` | *(required)* | HMAC key for signing user session cookies. |
 | `KARET_WEBHOOK_SECRET` | *(empty)* | Shared secret enforced by `/api/events/s3`. Empty disables the webhook receiver. |
-| `NEXT_PUBLIC_S3_CONSOLE_URL` | `http://localhost:9001` | If set, the UI shows a Settings &rarr; S3 console link pointing at this URL. Empty hides the link entirely (recommended for AWS deployments). |
+| `S3_CONSOLE_URL` | `http://localhost:9001` | If set, the UI shows a Settings &rarr; S3 console link pointing at this URL. Empty hides the link entirely (recommended for AWS deployments). |
 
 ## Upgrading
 
