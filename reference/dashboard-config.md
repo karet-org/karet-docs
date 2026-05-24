@@ -10,6 +10,7 @@ interface DashboardConfig {
   analytic_table_id: string;     // which table this dashboard reads from
   filters: DashboardFilter[];
   panels: Panel[];
+  where?: AstNode[];             // optional baseline row filter (see below)
   layout?: {
     columns?: number;            // legacy fallback; ignored when gridTemplateColumns is set
     gridTemplateColumns?: string;
@@ -42,6 +43,39 @@ interface DashboardFilter {
 
 `dropdown` filters auto-populate options from the distinct values in the
 column. `date_range` shows two `<input type="date">` controls.
+
+## Where clause
+
+`config.where` is an optional array of [AstNode](./pipeline-config.md)
+predicates ANDed together. Rows that fail the predicate are excluded
+from every panel and from the FilterBar's dropdown options. Use it to
+hardcode "always exclude these rows" rules, e.g. dropping bank-internal
+entries from a spending view:
+
+```jsonc
+"where": [
+  { "kind": "ne", "left": { "kind": "col", "name": "category" },
+                 "right": { "kind": "str", "value": "TRANSFER" } },
+  { "kind": "ne", "left": { "kind": "col", "name": "category" },
+                 "right": { "kind": "str", "value": "INVESTMENT" } }
+]
+```
+
+Only boolean / value-producing AST nodes are supported: `col`, `str`,
+`num`, `bool`, `null`, `eq`, `ne`, `gt`, `lt`, `ge`, `le`, `contains`,
+`upper`, `lower`, `trim`, `coalesce`. Arithmetic, `if`, `parse_date`,
+`lookup_ref`, and `cast` throw at render time; filtering rows in a
+dashboard shouldn't need expressions that produce analytic columns.
+
+Three-valued logic on null:
+
+- `null == X` is `false` (matches SQL).
+- `null != X` is **`true`**. This intentionally diverges from SQL: a
+  `category != "X"` filter shouldn't blank out fresh parquet rows whose
+  category hasn't been backfilled yet.
+
+For interactive exclusion, use a `dropdown` filter instead. `where`
+runs before user-driven filtering and dropdown population.
 
 ## Panels
 
@@ -127,13 +161,20 @@ Single icon + ALL-CAPS label + one big aggregated value.
   group_by: "description",
   value: "amount",
   agg: "sum" | "count" | "avg" | "min" | "max",
-  limit?: number,    // top-N
+  x_bin?: "day" | "week" | "month" | "year",   // optional: time-series form
+  limit?: number,                              // top-N (only meaningful without x_bin)
   grid?: PanelGrid,
 }
 ```
 
-Renders as horizontal bars sorted descending. Setting `limit: 5` shows
-the top 5 only.
+Without `x_bin`: horizontal bars sorted by aggregated value descending,
+optional `limit` for "Top N" charts.
+
+With `x_bin`: groups by `binDate(group_by, x_bin)`, sorts labels
+chronologically, ignores `limit`, renders as **vertical** bars. Use
+this for monthly-spending histograms and similar time-series.
+
+Both forms participate in cross-filter clicks.
 
 ### Table
 
@@ -196,11 +237,59 @@ Colors countries by an aggregated value.
 The country column accepts ISO-3166 alpha-2, alpha-3, numeric, or common
 names. They're all resolved through a built-in lookup.
 
+### Sankey
+
+Multi-stage flow diagram (income → account → category and similar
+shapes). Renders via `d3-sankey` + SVG.
+
+```ts
+{
+  kind: "sankey",
+  title: "Cash Flow",
+  flows: SankeyFlow[],
+  labels?: Record<string, string>,   // optional pretty-name overrides
+  grid?: PanelGrid,
+}
+
+interface SankeyFlow {
+  from: string,                                  // categorical column
+  to: string,                                    // categorical column
+  value: string,                                 // numeric column
+  agg?: "sum" | "abs_sum" | "count",             // default "sum"
+  where?: AstNode[],                             // optional per-flow filter
+}
+```
+
+Each flow groups rows by `(from, to)`, aggregates the `value` column,
+and emits one ribbon per non-zero pair. Stack flows to chain stages: a
+flow whose `from` matches a previous flow's `to` extends the diagram
+to the right.
+
+`agg: "abs_sum"` is useful when income rows carry negative amounts and
+you want the ribbon width to reflect magnitude regardless of sign.
+
+`where` is the same boolean AST subset as the dashboard-level `where`
+clause. Use it to scope a flow to one slice of the table without
+filtering the whole dashboard. The dashboard-level `where` still runs
+first.
+
+`labels` maps raw values to display labels. Useful for collapsing CSV
+variants like `PAYROLL DEPOSIT` into `Payroll` without rewriting the
+underlying data.
+
+Click a node to cross-filter the rest of the dashboard by that node's
+source column. Hovering shows a styled tooltip. Ribbons are
+hover-only; a `(from, to)` ribbon maps to two columns, not one, so
+click semantics are ambiguous.
+
 ## Cross-filtering
 
-Doughnut, bar, and choropleth panels are click-to-filter: clicking a slice
-or bar dims the others and filters every panel except the source itself.
-Click again to clear; or click the chip in the filter bar.
+Doughnut, bar, choropleth, and sankey panels are click-to-filter:
+clicking a slice, bar, country, or sankey node dims the others and
+filters every panel except the one clicked. Click again, or click the
+chip in the filter bar, to clear. Bar panels with `x_bin` emit a
+date-binned filter, so clicking the `2026-01` bar narrows other panels
+to rows in January 2026. Line panels are read-only.
 
 ## Worked example
 
@@ -212,6 +301,14 @@ Click again to clear; or click the chip in the filter bar.
   "filters": [
     { "kind": "dropdown", "column": "account", "label": "Account" },
     { "kind": "date_range", "column": "date", "label": "Date range" }
+  ],
+  "where": [
+    { "kind": "ne", "left": { "kind": "col", "name": "category" },
+                   "right": { "kind": "str", "value": "TRANSFER" } },
+    { "kind": "ne", "left": { "kind": "col", "name": "category" },
+                   "right": { "kind": "str", "value": "INVESTMENT" } },
+    { "kind": "ne", "left": { "kind": "col", "name": "category" },
+                   "right": { "kind": "str", "value": "INCOME" } }
   ],
   "panels": [
     { "kind": "kpi", "title": "Total Spending", "column": "amount",
@@ -225,15 +322,15 @@ Click again to clear; or click the chip in the filter bar.
     { "kind": "doughnut", "title": "By Category",
       "group_by": "category", "value": "amount", "agg": "sum",
       "grid": { "aspect": "square", "maxHeight": "20rem" } },
-    { "kind": "line", "title": "Monthly Trend", "x": "date",
-      "x_bin": "month", "y": "amount", "agg": "sum",
+    { "kind": "bar", "title": "Monthly Spending", "group_by": "date",
+      "x_bin": "month", "value": "amount", "agg": "sum",
       "grid": { "gridColumn": "span 2" } },
-    { "kind": "bar", "title": "Top Merchants", "group_by": "description",
-      "value": "amount", "agg": "sum", "limit": 5,
+    { "kind": "bar", "title": "Top 10 Merchants", "group_by": "merchant",
+      "value": "amount", "agg": "sum", "limit": 10,
       "grid": { "gridColumn": "1 / -1" } },
     { "kind": "table", "title": "Transactions",
-      "columns": ["date", "description", "amount", "account", "category"],
-      "page_size": 8, "grid": { "gridColumn": "1 / -1" } }
+      "columns": ["date", "description", "merchant", "amount", "account", "category"],
+      "page_size": 10, "grid": { "gridColumn": "1 / -1" } }
   ],
   "layout": {
     "gridTemplateColumns": "repeat(auto-fit, minmax(max(18rem, calc((100% - 2rem) / 3)), 1fr))",

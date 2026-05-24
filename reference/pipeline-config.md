@@ -37,7 +37,7 @@ streams them through the configured mappings.
 ## Lookup mappings
 
 Reusable lookup tables that turn one input value into another. Useful
-for category tagging or code-to-name expansion.
+for category tagging, merchant normalization, or code-to-name expansion.
 
 ```ts
 interface LookupMapping {
@@ -46,12 +46,15 @@ interface LookupMapping {
   match: "exact" | "keyword_substring";
   case_insensitive: boolean;
   rows: { input_patterns: string[]; output: string }[];
-  children: LookupMapping[]; // hierarchical lookups; usually empty
+  children: LookupMapping[];        // hierarchical lookups; usually empty
+  catch_all?: { output: string };   // optional: returned when no row matches
 }
 ```
 
 Reference one from a mapping expression with `{ kind: "lookup_ref",
-lookup_id, input }`.
+lookup_id, input }`. Without `catch_all`, an unmatched input returns
+`null`. Pair the lookup with `coalesce` to fall back to the raw input
+(see "Merchant normalization" below).
 
 ## Mappings
 
@@ -79,11 +82,37 @@ common nodes:
 | `str` | `{ kind: "str", value }` | String literal. |
 | `parse_date` | `{ kind: "parse_date", input, format }` | Parse a string with a strftime-style format. |
 | `cast` | `{ kind: "cast", input, to }` | Cast to `int64`, `float64`, `string`. |
-| `upper` / `lower` | `{ kind: "upper", input }` | Case folding. |
+| `upper` / `lower` / `trim` | `{ kind: "upper", input }` | Case folding / whitespace strip. |
 | `mul` / `add` / `sub` / `div` | `{ kind: "mul", left, right }` | Numeric ops. |
-| `lookup_ref` | `{ kind: "lookup_ref", lookup_id, input }` | Apply a lookup mapping. |
+| `lookup_ref` | `{ kind: "lookup_ref", lookup_id, input }` | Apply a lookup mapping (returns `null` on miss when there's no `catch_all`). |
+| `coalesce` | `{ kind: "coalesce", args: AstNode[] }` | First non-null arg; `null` if every arg is null. |
 
 See `src/karet-worker/src/evaluator.rs` for the full set.
+
+### Merchant normalization
+
+CSV descriptions for one merchant often appear under several variants
+(`MARUHACHI RA MEN LIBRA`, `MARUHACHI RA MEN LIBRARY`). To collapse
+them into one canonical name without losing anything for unmatched
+rows:
+
+```jsonc
+{ "name": "merchant",
+  "expr": { "kind": "coalesce",
+    "args": [
+      { "kind": "lookup_ref", "lookup_id": "merchants",
+        "input": { "kind": "upper",
+                   "input": { "kind": "trim",
+                              "input": { "kind": "col", "name": "description" } } } },
+      { "kind": "upper",
+        "input": { "kind": "trim",
+                   "input": { "kind": "col", "name": "description" } } }
+    ] } }
+```
+
+When the `merchants` lookup matches, the column gets the canonical
+name. Otherwise it falls back to the cleaned description. The Spending
+Tracker template (`src/karet/lib/templates/index.ts`) uses this shape.
 
 ## Analytic tables
 
