@@ -297,11 +297,11 @@ Total is roughly **$100-120/mo** before data transfer. Replacing NAT with VPC en
 
 Before flipping prod traffic:
 
-- [ ] Task roles replace the static `AWS_*` keys from `docker-compose.yaml`.
-- [ ] `AWS_ENDPOINT_URL` on both services is set to `https://s3.<REGION>.amazonaws.com`.
-- [ ] `KARET_SESSION_SECRET` is sourced from Secrets Manager.
-- [ ] Bucket has versioning + public access block on.
-- [ ] `/health` returns 200 from the worker task behind its target group.
-- [ ] ALB listener has ACM cert and redirects 80 → 443.
-- [ ] CloudWatch log groups exist and are receiving data.
-- [ ] S3 event notifications land a test job on the worker.
+- Task roles replace the static `AWS_*` keys from `compose.yml`.
+- `AWS_ENDPOINT_URL` on both services is set to `https://s3.<REGION>.amazonaws.com`.
+- `KARET_SESSION_SECRET` is sourced from Secrets Manager.
+- Bucket has versioning + public access block on.
+- `/health` returns 200 from the worker task behind its target group.
+- ALB listener has ACM cert and redirects 80 to 443.
+- CloudWatch log groups exist and are receiving data.
+- S3 event notifications land a test job on the worker.

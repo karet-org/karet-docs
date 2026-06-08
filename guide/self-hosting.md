@@ -25,7 +25,7 @@ freshness.
 
 ## 1. Drop in the compose file
 
-Save this as `docker-compose.yaml` in an empty directory:
+Save this as `compose.yml` in an empty directory:
 
 ```yaml
 name: karet
