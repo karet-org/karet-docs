@@ -6,17 +6,18 @@ coalesces a batch upload (say, 12 monthly CSVs) into a single job.
 
 ## How it works
 
-```
-        s3:ObjectCreated:*                   POST /api/events/s3
-RustFS ─────────────────────▶  karet      ────────────────────▶  in-memory debouncer
-                                                                       │
-                                                                       │ 5s of quiet
-                                                                       │ (or 30s max wait)
-                                                                       ▼
-                                                                  startJob({ slug, "webhook" })
-                                                                       │
-                                                                       ▼
-                                                                karet-worker /jobs/run
+```mermaid
+flowchart TB
+  rustfs["RustFS"]
+  web["karet"]
+  debouncer["in-memory debouncer"]
+  startjob["startJob({ slug, &quot;webhook&quot; })"]
+  worker["karet-worker /jobs/run"]
+
+  rustfs -->|"s3:ObjectCreated:*"| web
+  web -->|"POST /api/events/s3"| debouncer
+  debouncer -->|"5s of quiet (or 30s max wait)"| startjob
+  startjob --> worker
 ```
 
 - The receiver lives at **`POST /api/events/s3`** in the web service.

@@ -9,6 +9,7 @@ Karet is three services orchestrated by Docker Compose, backed by three S3 bucke
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, and owns auth. |
 
 ```mermaid
+%%{ init: { "flowchart": { "nodeSpacing": 55, "rankSpacing": 70 } } }%%
 flowchart TB
   web["karet (Next.js) :3000"]
   worker["karet-worker (Rust / Axum / Polars)"]
@@ -19,14 +20,18 @@ flowchart TB
     warehouse[("karet-warehouse")]
   end
 
-  web -->|"POST /jobs/run"| worker
+  %% web edges, ordered left -> center -> right
   web -->|"read config / dashboards / jobs"| pipelines
+  web -->|"POST /jobs/run"| worker
   web -->|"query Parquet (DuckDB)"| warehouse
-  lake -->|"object-put webhook"| web
 
+  %% worker edges, ordered left -> center -> right
   worker -->|"read config"| pipelines
   worker -->|"read raw data"| lake
   worker -->|"write Parquet"| warehouse
+
+  %% webhook back-edge declared last so it routes around the graph
+  lake -->|"object-put webhook"| web
 ```
 
 ## The three buckets
