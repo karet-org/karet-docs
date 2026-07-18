@@ -40,14 +40,33 @@ Three services come up:
 | `worker` | `:8080` | The Rust/Axum pipeline worker |
 | `rustfs` | `:9000` (`:9001` console) | S3-compatible object store |
 
-## 3. Set the admin password
+## 3. Create the buckets
+
+Karet stores data in three S3 buckets and does **not** create them
+automatically. Create them once against the bundled RustFS (using the
+default `rustfsadmin` credentials the stack ships with):
+
+```sh
+export AWS_ACCESS_KEY_ID=rustfsadmin
+export AWS_SECRET_ACCESS_KEY=rustfsadmin
+
+for b in karet-pipelines karet-lake karet-warehouse; do
+  aws --endpoint-url http://localhost:9000 --region us-east-1 \
+    s3api create-bucket --bucket "$b"
+done
+```
+
+Or create `karet-pipelines`, `karet-lake`, and `karet-warehouse` from
+the RustFS console at <http://localhost:9001>.
+
+## 4. Set the admin password
 
 Open <http://localhost:3000>. The first visit shows a "Set admin password"
 form. Pick a password (≥ 8 characters) and click **Set password**.
 
 You're now signed in. Subsequent visits will show a normal sign-in form.
 
-## 4. Create your first pipeline
+## 5. Create your first pipeline
 
 From the home page, click **+ New pipeline** and pick the **Spending Tracker**
 template. This provisions:
@@ -60,7 +79,7 @@ template. This provisions:
 - A dashboard with KPI tiles, a category doughnut, a monthly-trend line,
   a top-merchants bar, and a transactions table.
 
-## 5. Drop in some data
+## 6. Drop in some data
 
 Upload one or more CSVs to the source prefix:
 
@@ -73,7 +92,7 @@ If you've enabled the [auto-run webhook](./webhooks), the upload triggers
 a pipeline run automatically (with a 5-second debounce so a batch upload
 becomes one job). Otherwise click **Run Pipeline** on the **Jobs** page.
 
-## 6. View the dashboard
+## 7. View the dashboard
 
 Navigate to **Dashboards → Spending Overview**. KPIs, charts, and the
 transactions table all populate from the Parquet output.

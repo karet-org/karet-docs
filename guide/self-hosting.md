@@ -124,11 +124,34 @@ docker compose up -d
 
 First boot pulls ~250 MB of images.
 
-Open <http://localhost:3000>. The first visit shows a "Set admin
+## 4. Create the buckets
+
+Karet stores data in three S3 buckets and does **not** create them for
+you. With the stack up, create them once against RustFS. The defaults
+are `karet-pipelines`, `karet-lake`, and `karet-warehouse` (override
+with the `S3_BUCKET_*` variables in the reference below).
+
+The AWS CLI reads credentials from the environment — use the same keys
+RustFS was started with (defaults `rustfsadmin` / `rustfsadmin`):
+
+```sh
+export AWS_ACCESS_KEY_ID=rustfsadmin
+export AWS_SECRET_ACCESS_KEY=rustfsadmin
+
+for b in karet-pipelines karet-lake karet-warehouse; do
+  aws --endpoint-url http://localhost:9000 --region us-east-1 \
+    s3api create-bucket --bucket "$b"
+done
+```
+
+No CLI handy? Create the three buckets from the RustFS console at
+<http://localhost:9001> instead.
+
+Now open <http://localhost:3000>. The first visit shows a "Set admin
 password" form. Pick a password (≥ 8 characters) and click **Set
 password**.
 
-## 4. Tail the logs (optional)
+## 5. Tail the logs (optional)
 
 ```sh
 docker compose logs -f web worker
