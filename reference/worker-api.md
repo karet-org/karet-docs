@@ -42,7 +42,7 @@ Execute a pipeline run.
 }
 ```
 
-`clean_run: true` deletes existing `clean/<table_id>/` output before
+`clean_run: true` deletes existing `<table_id>/` output before
 running, so removed CSVs don't leave stale partitions behind. The default
 (`false`) is incremental: re-running with the same inputs is idempotent
 and overwrites partitions in place.
@@ -65,9 +65,8 @@ the same error shape as `/config/validate`.
 
 - The worker is **stateless**. Every run reads its inputs from S3 and
   writes outputs back to S3.
-- It uses Polars under the hood. `POLARS_MAX_THREADS=2` is set in the
-  default compose to keep memory in check on small machines; raise it
-  for bigger workloads.
+- It uses Polars: source files load into a DataFrame, mapping expressions
+  compile to Polars expressions, and each partition is written as Parquet.
 - A 30-minute fetch timeout is enforced by the **caller** (`karet`,
   via `AbortSignal.timeout`). The worker itself doesn't time out.
 
@@ -75,8 +74,9 @@ the same error shape as `/config/validate`.
 
 | Variable | Purpose |
 |----------|---------|
-| `S3_BUCKET` | Bucket name. |
+| `S3_BUCKET_PIPELINES` | Bucket for pipeline configs (default `karet-pipelines`). |
+| `S3_BUCKET_LAKE` | Bucket for raw CSVs (default `karet-lake`). |
+| `S3_BUCKET_WAREHOUSE` | Bucket for Parquet output (default `karet-warehouse`). |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | S3 credentials. |
 | `AWS_ENDPOINT_URL` | S3 endpoint URL (e.g. `http://rustfs:9000` for local dev, `https://s3.<region>.amazonaws.com` for real AWS). |
 | `PORT` | Optional HTTP listen port (default `8080`). |
-| `POLARS_MAX_THREADS` | Optional cap on the Polars thread pool. |

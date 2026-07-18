@@ -22,7 +22,7 @@ RustFS ─────────────────────▶  karet
 - The receiver lives at **`POST /api/events/s3`** in the web service.
 - It verifies a shared secret (`KARET_WEBHOOK_SECRET`), parses the S3
   event payload, extracts the pipeline slug from each
-  `pipelines/<slug>/raw/...` key, and asks the debouncer to schedule a
+  `pipelines/<slug>/...` key, and asks the debouncer to schedule a
   run.
 - The debouncer fires after **5 seconds of quiet**, or after
   **30 seconds since the first event in the batch**, whichever comes first.
@@ -57,31 +57,31 @@ RustFS doesn't auto-subscribe. You have to call
 ./scripts/setup-rustfs-webhook.sh
 ```
 
-This subscribes `s3://karet-data` to `arn:rustfs:sqs::primary:webhook` for
+This subscribes `s3://karet-lake` to `arn:rustfs:sqs::primary:webhook` for
 all `ObjectCreated:*` events on `*.csv` keys. The subscription persists
 across RustFS restarts (it's stored in bucket metadata).
 
 ### 4. Test it
 
-Upload a CSV to any pipeline's raw prefix:
+Upload a CSV to any pipeline's raw prefix in the lake bucket:
 
 ```sh
 aws --endpoint-url=http://localhost:9000 \
-  s3 cp test.csv s3://karet-data/pipelines/<slug>/raw/transactions/
+  s3 cp test.csv s3://karet-lake/pipelines/<slug>/transactions/
 ```
 
 Within ~5 seconds, a new job appears on the Jobs page with an `auto` chip.
 
 ## Scaling out
 
-The debouncer state is intentionally ephemeral: a `Map<slug, Timer>` in
-module scope. If web restarts mid-debounce, the in-flight timer is lost,
-but the next upload re-triggers it and the pipeline is idempotent.
+The debouncer state is a `Map<slug, Timer>` in module scope. If web
+restarts mid-debounce the timer is lost, but the next upload re-triggers
+it and the pipeline is idempotent.
 
-If you ever run more than one `web` replica behind a load balancer,
-events for the same slug can land on different replicas and each will
-maintain its own timer, defeating the debounce. At that point, swap the
-in-memory map for Redis or a Postgres advisory lock.
+This only works with a single `web` replica. Behind a load balancer,
+events for one slug can hit different replicas and each keeps its own
+timer, defeating the debounce, so move the map to Redis or a Postgres
+advisory lock first.
 
 ## Disabling
 

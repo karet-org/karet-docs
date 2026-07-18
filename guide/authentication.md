@@ -15,13 +15,13 @@ password** form. Submitting it:
    created_at }`.
 3. Issues a session cookie and redirects you to the home page.
 
-The setup endpoint refuses if an admin already exists. A network
-attacker who finds it open can't use it to seed a backdoor account.
+The setup endpoint refuses if an admin already exists, so it can't be
+used to seed a backdoor account.
 
 ## Sessions
 
 The session cookie is **HMAC-signed** with `KARET_SESSION_SECRET`. The
-payload is `{ exp: <unix-seconds> }` -- Karet is single-admin, so
+payload is `{ exp: <unix-seconds> }`, Karet is single-admin, so
 possession of a valid HMAC over a fresh `exp` is the entire authorization
 signal. Sessions last 7 days.
 
@@ -46,7 +46,7 @@ an admin exists.
 
 There is no machine-readable HTTP API for Karet. The endpoints under
 `/api/*` exist solely to back the browser UI and are not a public
-contract -- they require a session cookie. For automation, talk
+contract, they require a session cookie. For automation, talk
 directly to the S3 store: pipelines, dashboards, and jobs all live as
 JSON / Parquet objects under `pipelines/<slug>/`. The
 [`karet-skills`](https://github.com/karet-org/karet/tree/main/src/karet-skills)

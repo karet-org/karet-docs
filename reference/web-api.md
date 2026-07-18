@@ -2,7 +2,7 @@
 
 The web service (`karet`) hosts both the UI and the JSON API the UI
 talks to. The `/api/*` routes exist solely to back the browser UI and
-require a session cookie -- they are not a stable public surface and
+require a session cookie, they are not a stable public surface and
 not intended for scripting. For machine-driven workflows, talk
 directly to the S3 store: pipelines, dashboards, and jobs all live as
 JSON / Parquet objects under `pipelines/<slug>/`.
@@ -28,8 +28,8 @@ below.
 | `GET /api/pipelines` | List pipeline slugs. |
 | `POST /api/pipelines` | Body `{ slug, template }`. Provisions a new pipeline from a template. |
 | `POST /api/pipelines/import` | Multipart upload of a `.zip` exported from another instance. |
-| `DELETE /api/pipelines/[slug]` | Delete every object under `pipelines/<slug>/`. |
-| `PATCH /api/pipelines/[slug]` | Body `{ newSlug }`. Renames by copy-then-delete. |
+| `DELETE /api/pipelines/[slug]` | Delete every object under `pipelines/<slug>/` across all three buckets. |
+| `PATCH /api/pipelines/[slug]` | Body `{ newSlug }`. Renames by copy-then-delete across all three buckets. |
 
 ## Per-pipeline
 
@@ -41,10 +41,15 @@ below.
 | `GET /api/p/[pipeline]/dashboards` | List dashboard names. |
 | `GET /api/p/[pipeline]/dashboards/[name]` | Fetch a single dashboard config. |
 | `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, file count. |
-| `GET /api/p/[pipeline]/tables/[table]/rows` | Stream the table's rows (parses every Parquet file under the prefix). |
+| `GET /api/p/[pipeline]/tables/[table]/rows` | The table's rows, read from the warehouse with DuckDB `read_parquet`. |
+| `POST /api/p/[pipeline]/query` | Body `{ sql }`. Runs SQL against the pipeline's warehouse tables (each exposed as a DuckDB relation over its Parquet). Returns `{ columns, rows }`. |
+| `GET /api/p/[pipeline]/queries` | List saved queries (`{ queries: SavedQuery[] }`). |
+| `POST /api/p/[pipeline]/queries` | Body `{ name, sql }`. Save a query under a unique name. `409` if the name is taken. |
+| `GET /api/p/[pipeline]/queries/[id]` | Fetch a single saved query. |
+| `DELETE /api/p/[pipeline]/queries/[id]` | Delete a saved query. |
 | `GET /api/p/[pipeline]/jobs` | Job history with orphan reconciliation (`running` jobs older than 10 min get marked `failed`). |
 | `POST /api/p/[pipeline]/jobs?clean=true` | Trigger a manual run. Returns the initial `running` record immediately; the worker call happens in the background. |
-| `GET /api/p/[pipeline]/export` | Stream a `.zip` of every object under the slug. |
+| `GET /api/p/[pipeline]/export` | Stream a `.zip` of every object under the slug (across all three buckets). |
 
 ## Webhooks
 
@@ -74,7 +79,7 @@ Common codes:
 | Code | Meaning |
 |------|---------|
 | `unauthorized` | Missing/invalid session cookie. |
-| `bucket_not_found` | The S3 bucket doesn't exist. Most-common cause: S3_BUCKET mistype. |
+| `bucket_not_found` | An S3 bucket doesn't exist. Most-common cause: an `S3_BUCKET_*` mistype. |
 | `s3_error` | Catch-all for everything else from the S3 SDK. |
 | `pipeline_config_not_found` | The slug exists but its `pipeline.json` is missing. |
 | `dashboard_not_found` | The slug exists but no dashboard at the given name. |

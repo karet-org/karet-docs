@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Karet
   text: Self-hostable analytics platform
-  tagline: Ingest CSVs, build data pipelines, and visualize everything in configurable dashboards.
+  tagline: Ingest CSVs, build pipelines, and chart the results in configurable dashboards.
   actions:
     - theme: brand
       text: Get started

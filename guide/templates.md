@@ -16,7 +16,7 @@ the graph editor.
 A worked example covering the full feature set:
 
 - **Source container** `transactions_raw` reads CSVs from
-  `pipelines/<slug>/raw/transactions/` with columns `date, description,
+  `pipelines/<slug>/transactions/` with columns `date, description,
   amount, account`.
 - **Lookup mappings**:
   - `categories` tags each row by keyword-substring match against the
@@ -30,7 +30,7 @@ A worked example covering the full feature set:
   `coalesce(lookup_ref(merchants, ...), cleaned_description)`. Rows
   the merchants lookup misses keep their cleaned description.
 - **Analytic table** `transactions` writes month-partitioned Parquet to
-  `pipelines/<slug>/clean/transactions/year=YYYY/month=MM/data.parquet`.
+  `pipelines/<slug>/transactions/year=YYYY/month=MM/data.parquet`.
 - **Dashboard** `Spending Overview` ships with three KPI tiles
   (Total Spending in CAD, Transactions count, Top Category), a category
   doughnut, a vertical Monthly Spending bar (`x_bin: "month"`), a
@@ -67,7 +67,7 @@ export const TEMPLATES: Record<TemplateId, Template> = {
     },
     rawFiles: {
       // optional plain-text seed data, e.g. a sample CSV.
-      "raw/your_table/sample.csv": "col1,col2\n…",
+      "your_table/sample.csv": "col1,col2\n…",
     },
   },
 };

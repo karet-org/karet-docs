@@ -1,6 +1,7 @@
 import { defineConfig } from "vitepress";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: "Karet",
   description: "Self-hostable analytics platform: pipelines, dashboards, S3.",
   cleanUrls: true,
@@ -11,7 +12,7 @@ export default defineConfig({
   // Doc references like http://localhost:3000 are intentional. They
   // point at the dev server the reader is supposed to run.
   ignoreDeadLinks: [/^https?:\/\/localhost/],
-  // Carrot-mark favicon (matches the web app's nav logo and keeps the
+  // Karet logo favicon (matches the web app's nav logo and keeps the
   // docs site and the running instance feeling like one product).
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
@@ -34,7 +35,6 @@ export default defineConfig({
             { text: "Templates", link: "/guide/templates" },
             { text: "Auto-runs (webhooks)", link: "/guide/webhooks" },
             { text: "Authentication", link: "/guide/authentication" },
-            { text: "Deploying to AWS", link: "/guide/deploy-aws" },
           ],
         },
       ],
@@ -65,4 +65,4 @@ export default defineConfig({
       copyright: "© Karet contributors",
     },
   },
-});
+}));

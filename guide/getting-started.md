@@ -1,6 +1,6 @@
 # Getting started
 
-Run the full Karet stack on your machine in under five minutes.
+Run the full Karet stack on your machine.
 
 ::: tip Just want to self-host?
 This guide builds from source so you can poke at the code. If you
@@ -23,8 +23,8 @@ cd karet
 echo "KARET_SESSION_SECRET=$(openssl rand -base64 48)" > .env
 ```
 
-The compose file refuses to start without `KARET_SESSION_SECRET`. That's
-deliberate. Running with a default value would let anyone forge a session.
+The compose file refuses to start without `KARET_SESSION_SECRET`: a
+default value would let anyone forge a session.
 
 ## 2. Start the stack
 
@@ -52,10 +52,10 @@ You're now signed in. Subsequent visits will show a normal sign-in form.
 From the home page, click **+ New pipeline** and pick the **Spending Tracker**
 template. This provisions:
 
-- A source container at `pipelines/<slug>/raw/transactions/` that expects
+- A source container at `pipelines/<slug>/transactions/` that expects
   `date, description, amount, account` CSVs.
 - A keyword-lookup mapping that tags each row with a category.
-- An analytic table written to `pipelines/<slug>/clean/transactions/` as
+- An analytic table written to `pipelines/<slug>/transactions/` as
   partitioned Parquet.
 - A dashboard with KPI tiles, a category doughnut, a monthly-trend line,
   a top-merchants bar, and a transactions table.
@@ -66,7 +66,7 @@ Upload one or more CSVs to the source prefix:
 
 ```sh
 aws --endpoint-url=http://localhost:9000 \
-  s3 cp my-jan.csv s3://karet-data/pipelines/<slug>/raw/transactions/
+  s3 cp my-jan.csv s3://karet-lake/pipelines/<slug>/transactions/
 ```
 
 If you've enabled the [auto-run webhook](./webhooks), the upload triggers

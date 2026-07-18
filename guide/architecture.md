@@ -1,72 +1,80 @@
 # Architecture
 
-Karet is three services orchestrated by Docker Compose.
+Karet is three services orchestrated by Docker Compose, backed by three S3 buckets.
 
 | Service | Stack | Role |
 |---------|-------|------|
-| **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Holds raw CSVs, pipeline configs, dashboards, and Parquet output. |
-| **karet-worker** | Rust / Axum / Polars | Reads a pipeline config from S3, ingests CSVs, applies AST-JSON mapping expressions, writes partitioned Parquet. |
-| **karet** | Next.js / React Flow / Chart.js | Renders the UI: pipeline list, graph editor, jobs, tables, dashboards. Also owns auth. |
+| **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Hosts the three Karet buckets. |
+| **karet-worker** | Rust / Axum / Polars | Reads a pipeline config, ingests source CSVs, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet. |
+| **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, and owns auth. |
 
+```mermaid
+flowchart TB
+  web["karet (Next.js) :3000"]
+  worker["karet-worker (Rust / Axum / Polars)"]
+
+  subgraph s3["rustfs (S3 API) :9000"]
+    pipelines[("karet-pipelines")]
+    lake[("karet-lake")]
+    warehouse[("karet-warehouse")]
+  end
+
+  web -->|"POST /jobs/run"| worker
+  web -->|"read config / dashboards / jobs"| pipelines
+  web -->|"query Parquet (DuckDB)"| warehouse
+  lake -->|"object-put webhook"| web
+
+  worker -->|"read config"| pipelines
+  worker -->|"read raw data"| lake
+  worker -->|"write Parquet"| warehouse
 ```
-                          ┌─────────────────┐
-                          │  karet          │
-                          │   (Next.js)     │ :3000
-                          └─┬─────────┬─────┘
-                            │         │
-                  HTTP POST │         │ S3 read/write
-                            ▼         ▼
-                   ┌─────────────┐  ┌────────────┐
-                   │ karet-worker│  │  rustfs    │ :9000
-                   │ (Rust/Axum) │◀─│  (S3 API)  │
-                   └─────────────┘  └────────────┘
-                          ▲                │
-                          │  S3 events     │
-                          └────────────────┘
-                          (object-put webhook)
-```
 
-## Why the split
+## The three buckets
 
-- **All persistent state lives in S3.** No database to back up. Pipeline
-  configs, dashboards, raw CSVs, Parquet output, job records, and the
-  admin password hash are all S3 objects.
-- **The web service holds the session cookie machinery and the UI.** It
-  also hosts the webhook receiver for RustFS object events.
-- **The worker is stateless.** It accepts a `pipeline_prefix`, reads the
-  config and raw CSVs from S3, runs Polars, writes Parquet, returns a
-  result.
+Splitting by data class lets you set different lifecycle, access, and cost
+policies per bucket.
+
+| Bucket | Env var | Holds |
+|--------|---------|-------|
+| `karet-pipelines` | `S3_BUCKET_PIPELINES` | Pipeline configs, dashboards, job records, admin password hash. |
+| `karet-lake` | `S3_BUCKET_LAKE` | Raw CSV files you upload. |
+| `karet-warehouse` | `S3_BUCKET_WAREHOUSE` | Query-ready partitioned Parquet. |
+
+## Design notes
+
+- **All persistent state lives in S3.** No database to back up.
+- **The web service holds the UI, auth, and the webhook receiver** for
+  RustFS object events.
+- **The worker is stateless.** It takes a `pipeline_prefix`, reads the config
+  and raw source data, runs Polars, writes Parquet, and returns a result.
 
 ## What lives where in S3
 
-For a pipeline at slug `<slug>`:
+Each bucket keys objects under `pipelines/<slug>/`, so a pipeline's data
+lines up across the three buckets:
 
 ```
-pipelines/<slug>/
-├── pipeline.json              # source containers + mappings + analytic tables
-├── raw/                       # raw inputs you upload
-│   └── transactions/*.csv
-├── clean/                     # worker output (partitioned Parquet)
-│   └── transactions/year=YYYY/month=MM/data.parquet
-├── dashboards/
-│   └── *.json                 # one per dashboard
-├── jobs/
-│   └── job-<ts>-<rand>.json   # pipeline-run history
-└── preview.png                # thumbnail used on the home page
+karet-pipelines  pipelines/<slug>/pipeline.json          # sources + mappings + tables
+                 pipelines/<slug>/dashboards/*.json       # one per dashboard
+                 pipelines/<slug>/queries/*.json          # one per saved query
+                 pipelines/<slug>/jobs/job-<ts>-<rand>.json
+                 pipelines/<slug>/preview.png             # home-page thumbnail
+                 _auth/admin.json                         # scrypt-hashed admin password
 
-_auth/
-└── admin.json                 # scrypt-hashed admin password
+karet-lake       pipelines/<slug>/transactions/*.csv     # raw inputs you upload
+
+karet-warehouse  pipelines/<slug>/transactions/year=YYYY/month=MM/data.parquet
 ```
 
 ## Trust boundaries
 
 - The web service binds publicly (port 3000 on the host).
 - The worker is reachable only over the compose network.
-- RustFS is exposed for local dev convenience but doesn't need to be.
-  The web and worker services reach it over the compose network.
+- RustFS is exposed for local dev convenience but doesn't need to be; the
+  web and worker services reach it over the compose network.
 - The webhook from RustFS to web carries a shared secret
-  (`KARET_WEBHOOK_SECRET`), so the receiver still rejects unauthorized
-  traffic if you do expose port 3000 to the internet.
+  (`KARET_WEBHOOK_SECRET`), so the receiver rejects unauthorized traffic
+  even if port 3000 is exposed.
 
-See [Authentication](./authentication) for details on the admin password
-flow and session cookies.
+See [Authentication](./authentication) for the admin password flow and
+session cookies.

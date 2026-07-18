@@ -15,14 +15,14 @@ interface PipelineConfig {
 
 ## Source containers
 
-A bag of CSVs sharing a schema, all under one S3 prefix.
+A bag of raw files sharing a schema, all under one S3 prefix in the lake.
 
 ```ts
 interface SourceContainer {
   id: string;             // e.g. "transactions_raw"
   name: string;           // human-readable
-  path_prefix: string;    // e.g. "raw/transactions/"
-  schema: ColumnSchema[]; // the columns you'll see in the raw CSVs
+  path_prefix: string;    // e.g. "transactions/"
+  schema: ColumnSchema[]; // the columns you'll see in the raw data
 }
 
 interface ColumnSchema {
@@ -31,8 +31,9 @@ interface ColumnSchema {
 }
 ```
 
-The worker lists every `*.csv` under `pipelines/<slug>/<path_prefix>` and
-streams them through the configured mappings.
+Sources are CSV (header row, comma-delimited). The worker lists every
+`.csv` file under `pipelines/<slug>/<path_prefix>` and streams them
+through the configured mappings.
 
 ## Lookup mappings
 
@@ -122,7 +123,7 @@ Where the worker writes Parquet output.
 interface AnalyticTable {
   id: string;
   name: string;
-  output_prefix: string;     // e.g. "clean/transactions/"
+  output_prefix: string;     // e.g. "transactions/"
   schema: ColumnSchema[];    // the columns the dashboard / table view will see
 }
 ```
@@ -140,7 +141,7 @@ The Spending Tracker template ships with this shape:
   "source_containers": [{
     "id": "transactions_raw",
     "name": "Transactions",
-    "path_prefix": "raw/transactions/",
+    "path_prefix": "transactions/",
     "schema": [
       { "name": "date", "type": "string" },
       { "name": "description", "type": "string" },
@@ -189,7 +190,7 @@ The Spending Tracker template ships with this shape:
   "analytic_tables": [{
     "id": "transactions",
     "name": "Transactions",
-    "output_prefix": "clean/transactions/",
+    "output_prefix": "transactions/",
     "schema": [
       { "name": "date", "type": "date" },
       { "name": "description", "type": "string" },

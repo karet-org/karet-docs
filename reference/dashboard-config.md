@@ -8,6 +8,7 @@ interface DashboardConfig {
   id: string;
   name: string;
   analytic_table_id: string;     // which table this dashboard reads from
+  query_id?: string;             // read from a saved query instead (see below)
   filters: DashboardFilter[];
   panels: Panel[];
   where?: AstNode[];             // optional baseline row filter (see below)
@@ -28,6 +29,29 @@ works:
 - `"repeat(auto-fit, minmax(18rem, 1fr))"`: responsive, no max.
 - `"repeat(auto-fit, minmax(max(18rem, calc((100% - 2rem) / 3)), 1fr))"`:
   responsive with a 3-column cap.
+
+## Data source: table or saved query
+
+By default a dashboard reads the Parquet of the analytic table named by
+`analytic_table_id`. Set `query_id` to instead back the dashboard with a
+[saved query](./web-api#saved-queries): the query runs against the warehouse
+and its result rows and columns become the dashboard's data and schema.
+
+```jsonc
+{
+  "id": "spend-by-merchant",
+  "name": "Spend by merchant",
+  "analytic_table_id": "transactions", // still required; used as a fallback label
+  "query_id": "monthly_spend",         // stem of pipelines/<slug>/queries/monthly_spend.json
+  "filters": [],
+  "panels": [ /* ... */ ]
+}
+```
+
+Save a query from the **Data** page (write SQL, click **Save**, name it); the
+name is slugified into the `query_id` you reference here. This lets a
+dashboard read from a join or aggregate across tables without a dedicated
+analytic table.
 
 ## Filters
 
