@@ -59,12 +59,10 @@ done
 Or create `karet-pipelines`, `karet-lake`, and `karet-warehouse` from
 the RustFS console at <http://localhost:9001>.
 
-## 4. Set the admin password
+## 4. Sign in
 
-Open <http://localhost:3000>. The first visit shows a "Set admin password"
-form. Pick a password (≥ 8 characters) and click **Set password**.
-
-You're now signed in. Subsequent visits will show a normal sign-in form.
+Open <http://localhost:3000> and sign in with the admin password you
+provisioned during [self-hosting setup](./self-hosting#_2-generate-the-secrets).
 
 ## 5. Create your first pipeline
 

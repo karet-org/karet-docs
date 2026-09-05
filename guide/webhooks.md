@@ -1,68 +1,93 @@
 # Auto-runs (webhooks)
 
-When you enable webhook notifications, uploading a CSV to a pipeline's raw
-prefix automatically triggers a pipeline run. A small in-process debouncer
-coalesces a batch upload (say, 12 monthly CSVs) into a single job.
+Uploading a CSV to a pipeline's raw prefix automatically triggers a
+pipeline run. A debouncer coalesces a batch upload (say, 12 monthly
+CSVs) into a single job.
+
+The receiver lives in the **worker**, and the debounce state lives in
+**Valkey** — the web service is not involved at all.
 
 ## How it works
 
 ```mermaid
 flowchart TB
   rustfs["RustFS"]
-  web["karet"]
-  debouncer["in-memory debouncer"]
-  startjob["startJob({ slug, &quot;webhook&quot; })"]
-  worker["karet-worker /jobs/run"]
+  worker["karet-worker POST /events/s3"]
+  debounce[("valkey debounce ZSET")]
+  queue[("valkey job stream")]
+  run["job runs on a worker"]
 
-  rustfs -->|"s3:ObjectCreated:*"| web
-  web -->|"POST /api/events/s3"| debouncer
-  debouncer -->|"5s of quiet (or 30s max wait)"| startjob
-  startjob --> worker
+  rustfs -->|"s3:ObjectCreated:* + auth token header"| worker
+  worker -->|"extend quiet window"| debounce
+  debounce -->|"5s of quiet (or 30s max wait)"| queue
+  queue --> run
 ```
 
-- The receiver lives at **`POST /api/events/s3`** in the web service.
-- It verifies a shared secret (`KARET_WEBHOOK_SECRET`), parses the S3
-  event payload, extracts the pipeline slug from each
-  `pipelines/<slug>/...` key, and asks the debouncer to schedule a
-  run.
-- The debouncer fires after **5 seconds of quiet**, or after
-  **30 seconds since the first event in the batch**, whichever comes first.
+- RustFS posts S3 event payloads to **`POST /events/s3`** on the worker,
+  authenticated by `KARET_WEBHOOK_SECRET` in a header
+  (`RUSTFS_NOTIFY_WEBHOOK_AUTH_TOKEN_PRIMARY` sends it as a bearer
+  token). The secret is **required** — the endpoint fails closed without
+  it.
+- The worker filters to object-created events in the lake bucket,
+  extracts the pipeline slug from each `pipelines/<slug>/...` key, and
+  extends that slug's debounce window in Valkey.
+- The debounce fires after **5 seconds of quiet**, or after **30 seconds
+  since the first event in the batch**, whichever comes first, then
+  enqueues a job like any manual run.
 - Auto-runs show up in the **Jobs** page tagged with a small blue `auto`
   chip. Manual runs are unchanged.
 
 ## Setup
 
-### 1. Generate a secret
+The bundled compose file wires the target for you (worker endpoint, auth
+token header, outbound allow-list). Two things are still required:
+
+### 1. Set the secret
 
 ```sh
 echo "KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)" >> .env
+docker compose up -d
 ```
 
-The compose file passes this value to both `rustfs` (which appends it as
-a `?secret=` query param) and `karet` (which verifies it).
+The compose file passes it to `rustfs` (as the webhook auth token) and
+to the worker (which verifies it). The worker refuses to start without
+it.
 
-### 2. Restart the stack
+### 2. Subscribe the bucket to the webhook target
+
+A webhook *target* alone delivers nothing — the lake bucket needs a
+notification *rule*, applied once with the AWS CLI:
 
 ```sh
-docker compose up -d --force-recreate
+aws --endpoint-url http://localhost:9000 --region us-east-1 \
+  s3api put-bucket-notification-configuration \
+  --bucket karet-lake --notification-configuration '{
+  "QueueConfigurations": [{
+    "Id": "karet-worker-webhook",
+    "QueueArn": "arn:rustfs:sqs:us-east-1:primary:webhook",
+    "Events": ["s3:ObjectCreated:*"],
+    "Filter": {"Key": {"FilterRules": [
+      {"Name": "prefix", "Value": "pipelines/"},
+      {"Name": "suffix", "Value": ".csv"}
+    ]}}
+  }]}'
 ```
 
-This picks up the new env vars.
+The rule persists in bucket metadata across restarts.
 
-### 3. Subscribe the bucket to the webhook target
+::: warning RustFS version quirk
+Some RustFS versions (observed on `1.0.0-rc.3`) load bucket notification
+rules **only at startup** — a freshly applied rule silently does nothing
+until you `docker compose restart rustfs`. Newer releases apply rules
+dynamically. If uploads don't trigger runs, restart RustFS first.
+:::
 
-RustFS doesn't auto-subscribe. You have to call
-`PutBucketNotificationConfiguration` once. The repo ships with a script:
+RustFS also health-checks the webhook origin with a `HEAD /` probe and
+only delivers to origins in `RUSTFS_OUTBOUND_ALLOW_ORIGINS` (set in the
+compose file). Both are handled by the bundled setup; remember them if
+you deviate.
 
-```sh
-./scripts/setup-rustfs-webhook.sh
-```
-
-This subscribes `s3://karet-lake` to `arn:rustfs:sqs::primary:webhook` for
-all `ObjectCreated:*` events on `*.csv` keys. The subscription persists
-across RustFS restarts (it's stored in bucket metadata).
-
-### 4. Test it
+### 3. Test it
 
 Upload a CSV to any pipeline's raw prefix in the lake bucket:
 
@@ -71,20 +96,26 @@ aws --endpoint-url=http://localhost:9000 \
   s3 cp test.csv s3://karet-lake/pipelines/<slug>/transactions/
 ```
 
-Within ~5 seconds, a new job appears on the Jobs page with an `auto` chip.
+Within ~5 seconds the worker logs `debounced upload event`, and a new
+job appears on the Jobs page with an `auto` chip.
 
 ## Scaling out
 
-The debouncer state is a `Map<slug, Timer>` in module scope. If web
-restarts mid-debounce the timer is lost, but the next upload re-triggers
-it and the pipeline is idempotent.
-
-This only works with a single `web` replica. Behind a load balancer,
-events for one slug can hit different replicas and each keeps its own
-timer, defeating the debounce, so move the map to Redis or a Postgres
-advisory lock first.
+Debounce state lives in a Valkey sorted set, not process memory, so it
+survives worker restarts and works with any number of worker replicas —
+the due-window pop is atomic, so a batch fires exactly one job no matter
+how many workers race for it. Multiple web replicas are equally fine;
+the web service doesn't participate in this flow.
 
 ## Disabling
 
-Leave `KARET_WEBHOOK_SECRET` empty in `.env`. The receiver fails closed
-(returns 401 on every request), and RustFS has nowhere to deliver to.
+Remove the bucket notification rule:
+
+```sh
+aws --endpoint-url http://localhost:9000 s3api \
+  put-bucket-notification-configuration \
+  --bucket karet-lake --notification-configuration '{}'
+```
+
+`KARET_WEBHOOK_SECRET` must stay set (the worker requires it), but with
+no rule subscribed, no events are ever delivered.

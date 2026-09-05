@@ -14,12 +14,13 @@ below.
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
-| `GET /api/auth/setup` | public | Returns `{ needsSetup: boolean }` so the login page knows which form to show. |
-| `POST /api/auth/setup` | public, single-shot | Body `{ password }`. Refuses if an admin already exists. |
-| `POST /api/auth/login` | public | Body `{ password }`. Sets the session cookie on success. |
+| `POST /api/auth/login` | public, rate-limited | Body `{ password }`. Sets the session cookie on success; `429` + `Retry-After` when throttled. |
 | `POST /api/auth/logout` | session | Clears the session cookie. |
 | `GET /api/auth/me` | session | Returns `{ authenticated: true }`. |
-| `PATCH /api/auth/me` | session | Body `{ currentPassword, newPassword }`. Re-issues the cookie. |
+
+The admin credential is provisioned via `KARET_ADMIN_PASSWORD_HASH`;
+there is no setup or password-change endpoint. See
+[Authentication](/guide/authentication).
 
 ## Pipelines
 
@@ -47,24 +48,23 @@ below.
 | `POST /api/p/[pipeline]/queries` | Body `{ name, sql }`. Save a query under a unique name. `409` if the name is taken. |
 | `GET /api/p/[pipeline]/queries/[id]` | Fetch a single saved query. |
 | `DELETE /api/p/[pipeline]/queries/[id]` | Delete a saved query. |
-| `GET /api/p/[pipeline]/jobs` | Job history with orphan reconciliation (`running` jobs older than 10 min get marked `failed`). |
-| `POST /api/p/[pipeline]/jobs?clean=true` | Trigger a manual run. Returns the initial `running` record immediately; the worker call happens in the background. |
+| `GET /api/p/[pipeline]/jobs` | Job history (S3) merged with live queue state from Valkey — active jobs carry a `progress` object (stage, file/mapping counters). Statuses: `queued`, `running`, `completed`, `failed`. |
+| `POST /api/p/[pipeline]/jobs?clean=true` | Trigger a manual run. Enqueues onto the job stream and returns the initial `queued` record immediately; a worker claims and executes it. |
 | `GET /api/p/[pipeline]/export` | Stream a `.zip` of every object under the slug (across all three buckets). |
 
 ## Webhooks
 
-| Endpoint | Auth | Purpose |
-|----------|------|---------|
-| `POST /api/events/s3` | shared secret | RustFS S3-event receiver. See [Auto-runs](/guide/webhooks). |
+The S3-event receiver lives on the **worker** (`POST /events/s3`), not
+the web service. See [Auto-runs](/guide/webhooks) and the
+[Worker API](./worker-api).
 
 ## Auth shape
 
 The middleware (`middleware.ts`) accepts requests authenticated by the
-`karet_session` cookie set by `/api/auth/login` or `/api/auth/setup`.
+`karet_session` cookie set by `/api/auth/login`.
 
-`/api/auth/*` and `/api/events/*` bypass the middleware and handle
-their own auth: the auth routes are public, and the events route checks
-a shared webhook secret.
+Only `/api/auth/*` bypasses the middleware; everything else requires a
+valid session cookie.
 
 ## Error shape
 
