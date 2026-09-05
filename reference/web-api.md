@@ -48,7 +48,7 @@ there is no setup or password-change endpoint. See
 | `POST /api/p/[pipeline]/queries` | Body `{ name, sql }`. Save a query under a unique name. `409` if the name is taken. |
 | `GET /api/p/[pipeline]/queries/[id]` | Fetch a single saved query. |
 | `DELETE /api/p/[pipeline]/queries/[id]` | Delete a saved query. |
-| `GET /api/p/[pipeline]/jobs` | Job history (S3) merged with live queue state from Valkey — active jobs carry a `progress` object (stage, file/mapping counters). Statuses: `queued`, `running`, `completed`, `failed`. |
+| `GET /api/p/[pipeline]/jobs` | Job history (S3) merged with live queue state from Valkey. Active jobs carry a `progress` object (stage, file/mapping counters). Statuses: `queued`, `running`, `completed`, `failed`. |
 | `POST /api/p/[pipeline]/jobs?clean=true` | Trigger a manual run. Enqueues onto the job stream and returns the initial `queued` record immediately; a worker claims and executes it. |
 | `GET /api/p/[pipeline]/export` | Stream a `.zip` of every object under the slug (across all three buckets). |
 

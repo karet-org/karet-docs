@@ -14,14 +14,14 @@ npm run hash-password
 ```
 
 The script reads the password from stdin (≥ 8 characters) and prints two
-forms: the plain hash for shell exports and systemd units, and a
-Docker-Compose-escaped form for `.env` files — compose interpolates `$`,
+forms: the plain hash for shell exports and systemd units, and an
+escaped form for Docker Compose `.env` files. Compose interpolates `$`,
 so every `$` in the hash must be doubled there. Paste the right one and
-start the stack; the web service refuses to start without it.
+start the stack. The web service refuses to start without it.
 
-There is no in-app setup form. This is deliberate: with no runtime write
-path for the credential, a wiped or restored bucket can never revert the
-instance to an unauthenticated "set admin password" state.
+There is no in-app setup form. With no runtime write path for the
+credential, a wiped or restored bucket can never revert the instance to
+an unauthenticated "set admin password" state.
 
 ## Changing the password
 
@@ -33,8 +33,8 @@ npm run hash-password        # paste output into .env
 docker compose up -d web
 ```
 
-Rotating the password hash **invalidates every outstanding session** —
-session cookies are signed with a key derived from both
+Rotating the password hash **invalidates every outstanding session**.
+Session cookies are signed with a key derived from both
 `KARET_SESSION_SECRET` and the password hash, so a stolen cookie dies
 with the old password. Rotating `KARET_SESSION_SECRET` has the same
 effect.
@@ -48,11 +48,11 @@ Sessions last 7 days.
 
 ## Login throttling
 
-scrypt verification is deliberately expensive (~128 MiB, ~0.5 s per
-attempt), so the login endpoint is throttled: each client gets a burst
-of 5 attempts refilling one per 15 seconds (reset on successful login),
-and at most 2 verifications run concurrently across all clients.
-Throttled requests get `429` with a `Retry-After` header.
+scrypt verification costs ~128 MiB and ~0.5 s per attempt, so the login
+endpoint is throttled: each client gets a burst of 5 attempts refilling
+one per 15 seconds (reset on successful login), and at most 2
+verifications run concurrently across all clients. Throttled requests
+get `429` with a `Retry-After` header.
 
 ## CI / automation
 

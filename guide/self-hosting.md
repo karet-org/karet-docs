@@ -18,7 +18,7 @@ The published images are:
 | `ghcr.io/karet-org/karet:latest` | [`karet-org/karet`](https://github.com/karet-org/karet), Next.js UI |
 | `ghcr.io/karet-org/karet-worker:latest` | [`karet-org/karet-worker`](https://github.com/karet-org/karet-worker), Rust/Axum pipeline worker |
 | `rustfs/rustfs:latest` | Upstream [RustFS](https://github.com/rustfs/rustfs) S3-compatible object store |
-| `valkey/valkey:8-alpine` | Upstream [Valkey](https://valkey.io) — job queue and live state |
+| `valkey/valkey:8-alpine` | Upstream [Valkey](https://valkey.io), job queue and live state |
 
 `:latest` tracks the default branch of each repo. Pin to a versioned
 tag (e.g. `0.2.0`) for reproducible deploys.
@@ -123,8 +123,8 @@ volumes:
   valkey-data:
 ```
 
-The worker and Valkey ports are intentionally not exposed to the host —
-they're only reachable over the compose network.
+The worker and Valkey ports are not exposed to the host. They are only
+reachable over the compose network.
 
 ## 2. Generate the secrets
 
@@ -142,9 +142,9 @@ EOF
 For the admin password hash, run `npm run hash-password` in a checkout
 of the [`karet`](https://github.com/karet-org/karet) repo. It prompts
 for a password (≥ 8 characters) and prints a ready-to-paste
-`KARET_ADMIN_PASSWORD_HASH=...` line in Compose-escaped form — append it
-to `.env`. See [Authentication](./authentication) for why compose needs
-the `$$`-escaped variant.
+`KARET_ADMIN_PASSWORD_HASH=...` line for `.env`. See
+[Authentication](./authentication) for why compose needs the
+`$$`-escaped variant.
 
 ## 3. Start the stack
 
@@ -161,7 +161,7 @@ you. With the stack up, create them once against RustFS. The defaults
 are `karet-pipelines`, `karet-lake`, and `karet-warehouse` (override
 with the `S3_BUCKET_*` variables in the reference below).
 
-The AWS CLI reads credentials from the environment — use the same keys
+The AWS CLI reads credentials from the environment. Use the same keys
 RustFS was started with (defaults `rustfsadmin` / `rustfsadmin`):
 
 ```sh

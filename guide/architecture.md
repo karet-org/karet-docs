@@ -6,7 +6,7 @@ hold all durable data, and a Valkey instance coordinates the job queue.
 | Service | Stack | Role |
 |---------|-------|------|
 | **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Hosts the three Karet buckets and posts upload events to the worker. |
-| **valkey** | [Valkey](https://valkey.io) | Job queue (Redis stream), live job state, and webhook debounce. Coordination only — losing it never loses history. |
+| **valkey** | [Valkey](https://valkey.io) | Job queue (Redis stream), live job state, and webhook debounce. Coordination only. Losing it never loses history. |
 | **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests source CSVs, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |
 
@@ -47,7 +47,7 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
    per-pipeline lock (`SET NX` with heartbeat renewal) so at most one
    run per pipeline executes cluster-wide, and marks the job `running`.
 3. **Execute.** The config is validated, CSVs ingested, and progress
-   (stage, file/mapping counters) streamed into the live hash — the Jobs
+   (stage, file/mapping counters) streamed into the live hash. The Jobs
    page polls it.
 4. **Finish.** The worker writes the terminal record to S3
    (`pipelines/<slug>/jobs/<id>.json`), updates the live hash (24 h
@@ -55,14 +55,14 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
 
 Failures retry with exponential backoff (up to `MAX_ATTEMPTS`, default
 3). If a worker crashes mid-run, its unacked message idles in the
-pending-entries list until another worker reclaims and re-runs it —
-runs are idempotent (the same partition keys are rewritten), so
+pending-entries list until another worker reclaims and re-runs it.
+Runs are idempotent (the same partition keys are rewritten), so
 at-least-once delivery is safe.
 
 **Division of state:** Valkey holds coordination data (queue, live
 status, debounce timers) that is small, hot, and expendable; S3 holds
 history that is durable and unbounded. A Valkey crash loses at most ~1
-second of coordination writes (AOF `everysec`) — a queued-but-unstarted
+second of coordination writes (AOF `everysec`): a queued-but-unstarted
 job, never a job record.
 
 ## The three buckets
@@ -85,7 +85,7 @@ policies per bucket.
   for RustFS upload events and every job-record write. The web service
   only enqueues and reads.
 - **The admin credential lives in the environment**
-  (`KARET_ADMIN_PASSWORD_HASH`), not in a bucket — see
+  (`KARET_ADMIN_PASSWORD_HASH`), not in a bucket. See
   [Authentication](./authentication).
 
 ## What lives where in S3
@@ -118,8 +118,8 @@ karet-warehouse  pipelines/<slug>/<table>/year=YYYY/month=MM/<mapping>.parquet
   services. Access to it is access to the job queue, so don't put it on
   a shared network.
 - RustFS is exposed for local dev convenience but doesn't need to be.
-- Job execution has no HTTP trigger at all — only things that can write
-  to the Redis stream can start a run.
+- Job execution has no HTTP trigger. Only things that can write to the
+  Redis stream can start a run.
 
 See [Authentication](./authentication) for the admin password flow and
 session cookies.

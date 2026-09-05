@@ -4,8 +4,8 @@ Uploading a CSV to a pipeline's raw prefix automatically triggers a
 pipeline run. A debouncer coalesces a batch upload (say, 12 monthly
 CSVs) into a single job.
 
-The receiver lives in the **worker**, and the debounce state lives in
-**Valkey** — the web service is not involved at all.
+The receiver lives in the worker and the debounce state lives in
+Valkey. The web service is not involved.
 
 ## How it works
 
@@ -26,7 +26,7 @@ flowchart TB
 - RustFS posts S3 event payloads to **`POST /events/s3`** on the worker,
   authenticated by `KARET_WEBHOOK_SECRET` in a header
   (`RUSTFS_NOTIFY_WEBHOOK_AUTH_TOKEN_PRIMARY` sends it as a bearer
-  token). The secret is **required** — the endpoint fails closed without
+  token). The secret is required; the endpoint fails closed without
   it.
 - The worker filters to object-created events in the lake bucket,
   extracts the pipeline slug from each `pipelines/<slug>/...` key, and
@@ -55,8 +55,8 @@ it.
 
 ### 2. Subscribe the bucket to the webhook target
 
-A webhook *target* alone delivers nothing — the lake bucket needs a
-notification *rule*, applied once with the AWS CLI:
+A webhook target alone delivers nothing. The lake bucket needs a
+notification rule, applied once with the AWS CLI:
 
 ```sh
 aws --endpoint-url http://localhost:9000 --region us-east-1 \
@@ -77,9 +77,9 @@ The rule persists in bucket metadata across restarts.
 
 ::: warning RustFS version quirk
 Some RustFS versions (observed on `1.0.0-rc.3`) load bucket notification
-rules **only at startup** — a freshly applied rule silently does nothing
-until you `docker compose restart rustfs`. Newer releases apply rules
-dynamically. If uploads don't trigger runs, restart RustFS first.
+rules only at startup. A freshly applied rule does nothing until you
+`docker compose restart rustfs`. Newer releases apply rules dynamically.
+If uploads don't trigger runs, restart RustFS first.
 :::
 
 RustFS also health-checks the webhook origin with a `HEAD /` probe and
@@ -102,10 +102,10 @@ job appears on the Jobs page with an `auto` chip.
 ## Scaling out
 
 Debounce state lives in a Valkey sorted set, not process memory, so it
-survives worker restarts and works with any number of worker replicas —
-the due-window pop is atomic, so a batch fires exactly one job no matter
-how many workers race for it. Multiple web replicas are equally fine;
-the web service doesn't participate in this flow.
+survives worker restarts and works with any number of worker replicas.
+The due-window pop is atomic: a batch fires exactly one job no matter
+how many workers race for it. Web replicas don't matter here; the web
+service doesn't participate in this flow.
 
 ## Disabling
 

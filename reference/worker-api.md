@@ -3,8 +3,8 @@
 The worker (`karet-worker`) is a Rust/Axum service that runs pipeline
 jobs. It binds to `:8080` inside the compose network.
 
-**Jobs do not arrive over HTTP.** The worker consumes them from the
-Valkey stream `karet:jobs:stream` via a consumer group — see
+Jobs do not arrive over HTTP. The worker consumes them from the Valkey
+stream `karet:jobs:stream` via a consumer group; see
 [Architecture](/guide/architecture#the-job-queue). The HTTP surface is
 three endpoints:
 
@@ -19,7 +19,7 @@ in-flight job count; returns `503` when Valkey is unreachable.
 { "redis": "ok", "queue_depth": 0, "in_flight": 1 }
 ```
 
-`GET /` also answers `200` — RustFS probes the webhook origin's root
+`GET /` also answers `200`. RustFS probes the webhook origin's root
 before delivering events.
 
 ### `POST /config/validate`
@@ -41,8 +41,8 @@ Used by the graph editor's "Validate" button.
 RustFS object-created notifications; drives [auto-runs](/guide/webhooks).
 
 **Auth**: the webhook secret, as `X-Karet-Webhook-Secret: <secret>` or an
-`Authorization` header (bare or `Bearer`-prefixed — RustFS's
-`WEBHOOK_AUTH_TOKEN` sends whichever form it's configured with).
+`Authorization` header, bare or `Bearer`-prefixed. RustFS's
+`WEBHOOK_AUTH_TOKEN` sends whichever form it's configured with.
 
 Accepts the standard S3 event envelope (`Records[].eventName`,
 `Records[].s3.bucket.name`, `Records[].s3.object.key`). Only
