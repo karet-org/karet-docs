@@ -10,17 +10,20 @@ Valkey. The web service is not involved.
 ## How it works
 
 ```mermaid
-flowchart TB
-  rustfs["RustFS"]
-  worker["karet-worker POST /events/s3"]
-  debounce[("valkey debounce ZSET")]
-  queue[("valkey job stream")]
-  run["job runs on a worker"]
+sequenceDiagram
+  participant R as RustFS
+  participant W as karet-worker
+  participant V as Valkey
 
-  rustfs -->|"s3:ObjectCreated:* + auth token header"| worker
-  worker -->|"extend quiet window"| debounce
-  debounce -->|"5s of quiet (or 30s max wait)"| queue
-  queue --> run
+  Note over R: CSVs uploaded to<br/>pipelines/&lt;slug&gt;/...
+  R->>W: POST /events/s3 (auth token)
+  W->>V: extend debounce window for slug
+  R->>W: POST /events/s3 (more uploads)
+  W->>V: extend window again
+  Note over V: 5s of quiet,<br/>or 30s max wait
+  W->>V: pop due slug, enqueue job
+  V-->>W: job claimed (consumer group)
+  W->>W: run pipeline
 ```
 
 - RustFS posts S3 event payloads to **`POST /events/s3`** on the worker,
