@@ -15,12 +15,12 @@ sequenceDiagram
   participant W as karet-worker
   participant V as Valkey
 
-  Note over R: CSVs uploaded to<br/>pipelines/&lt;slug&gt;/...
+  Note over R: CSVs uploaded to a pipeline's raw prefix
   R->>W: POST /events/s3 (auth token)
   W->>V: extend debounce window for slug
   R->>W: POST /events/s3 (more uploads)
   W->>V: extend window again
-  Note over V: 5s of quiet,<br/>or 30s max wait
+  Note over V: 5s of quiet, or 30s max wait
   W->>V: pop due slug, enqueue job
   V-->>W: job claimed (consumer group)
   W->>W: run pipeline
