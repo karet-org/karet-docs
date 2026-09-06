@@ -14,10 +14,10 @@ hero:
       link: https://github.com/karet-org/karet
 
 features:
-  - title: Three small services
-    details: A Next.js web UI, a Rust/Axum worker, and an S3-compatible object store. No database to operate.
-  - title: JSON-driven dashboards
-    details: Panels, layouts, aggregations, and chart aspect ratios all live in S3. Edit the config, the page updates.
+  - title: Four small services
+    details: A Next.js web UI, a Rust/Axum worker, an S3-compatible object store, and a Valkey job queue. No database to operate.
+  - title: SQL-driven dashboards
+    details: Every panel is a DuckDB query in a YAML config, edited in-app with autocomplete and inline validation. Click a chart to filter the rest.
   - title: Auto-runs on upload
     details: Drop a CSV into the bucket and a webhook kicks off a debounced pipeline run.
   - title: Single-admin auth

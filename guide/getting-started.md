@@ -32,13 +32,14 @@ default value would let anyone forge a session.
 docker compose up -d
 ```
 
-Three services come up:
+Four services come up:
 
 | Service | Port | Purpose |
 |---------|------|---------|
 | `web` | `:3000` | Karet's Next.js UI |
 | `worker` | `:8080` | The Rust/Axum pipeline worker |
 | `rustfs` | `:9000` (`:9001` console) | S3-compatible object store |
+| `valkey` | internal | Job queue and live job state |
 
 ## 3. Create the buckets
 
@@ -97,7 +98,7 @@ transactions table all populate from the Parquet output.
 
 ## What's next?
 
-- [Architecture](./architecture): the three services and how they connect.
+- [Architecture](./architecture): the four services and how they connect.
 - [Pipeline config](/reference/pipeline-config): the JSON shape that drives ingest.
 - [Dashboard config](/reference/dashboard-config): panel kinds, layout, cross-filters.
 - [Auto-runs](./webhooks): wire RustFS uploads to pipeline runs.
