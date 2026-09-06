@@ -6,9 +6,13 @@ SQL query against the warehouse; the config binds result columns to the
 visualization's channels. The SQL does the shaping, the config only does
 the binding.
 
-Edit dashboards in the app (each dashboard's **Edit** view): drafts save
-without validation, and publishing runs the full gate described below.
-Direct S3 edits are not the supported path.
+Edit dashboards in the app (each dashboard's **Edit** view): a
+CodeMirror YAML editor with line numbers, inline diagnostics from the
+validation gate (structural errors and SQL/binding failures underline
+the offending line), and context-aware autocomplete (panel keys by
+kind, enum values, and `$params`, tables, and columns inside query
+blocks). Drafts save without validation; publishing runs the full gate
+described below. Direct S3 edits are not the supported path.
 
 ## Document shape
 

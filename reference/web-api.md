@@ -32,6 +32,18 @@ there is no setup or password-change endpoint. See
 | `DELETE /api/pipelines/[slug]` | Delete every object under `pipelines/<slug>/` across all three buckets. |
 | `PATCH /api/pipelines/[slug]` | Body `{ newSlug }`. Renames by copy-then-delete across all three buckets. |
 
+## Workspace
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/settings` | Workspace UI settings (display name, workspace name, starred pipelines). |
+| `PUT /api/settings` | Replace the settings document (input sanitized). |
+| `GET /api/lake?prefix=` | One level of the lake bucket: folders and files. |
+| `PUT /api/lake?key=` | Upload one file (validated key, 100 MB cap). CSVs under a pipeline prefix trigger a debounced run. |
+| `POST /api/lake` | Body `{ from, to }`. Move an object (copy then delete). |
+| `DELETE /api/lake?key=` | Delete an object. |
+| `GET /api/lake/object?key=` | Download an object as an attachment. |
+
 ## Per-pipeline
 
 | Endpoint | Purpose |
@@ -42,7 +54,8 @@ there is no setup or password-change endpoint. See
 | `GET /api/p/[pipeline]/dashboards` | List published dashboards and drafts. |
 | `POST /api/p/[pipeline]/dashboards` | Create a draft from the v2 YAML template. |
 | `GET /api/p/[pipeline]/dashboards/[name]` | Fetch a dashboard's YAML (`?draft=1` for the draft). |
-| `PUT /api/p/[pipeline]/dashboards/[name]` | Save YAML (`?draft=1` skips validation). |
+| `PUT /api/p/[pipeline]/dashboards/[name]` | Save YAML. Published saves run the full gate; `?draft=1` saves without validation. |
+| `POST /api/p/[pipeline]/dashboards/[name]/validate` | Advisory full-gate validation (editor live feedback); always 200 with the verdict. |
 | `DELETE /api/p/[pipeline]/dashboards/[name]` | Delete draft and published objects. |
 | `POST /api/p/[pipeline]/dashboards/[name]/publish` | Validate a draft (schema, bindings, SQL) and publish it. |
 | `POST /api/p/[pipeline]/dashboards/[name]/data` | Run all panel queries with filter params; returns per-panel results. |
