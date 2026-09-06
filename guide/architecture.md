@@ -5,7 +5,7 @@ hold all durable data, and a Valkey instance coordinates the job queue.
 
 | Service | Stack | Role |
 |---------|-------|------|
-| **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Hosts the three Karet buckets and posts upload events to the worker. |
+| **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Hosts the three Karet buckets and posts upload events to the worker, which routes each event to every pipeline whose source prefix matches the uploaded key. |
 | **valkey** | [Valkey](https://valkey.io) | Job queue (Redis stream), live job state, and webhook debounce. Coordination only. Losing it never loses history. |
 | **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests source CSVs, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |

@@ -21,7 +21,7 @@ A bag of raw files sharing a schema, all under one S3 prefix in the lake.
 interface SourceContainer {
   id: string;             // e.g. "transactions_raw"
   name: string;           // human-readable
-  path_prefix: string;    // e.g. "transactions/"
+  path_prefix: string;    // absolute lake key prefix, e.g. "banks/rbc/chequing/"
   schema: ColumnSchema[]; // the columns you'll see in the raw data
 }
 
@@ -31,9 +31,17 @@ interface ColumnSchema {
 }
 ```
 
-Sources are CSV (header row, comma-delimited). The worker lists every
-`.csv` file under `pipelines/<slug>/<path_prefix>` and streams them
-through the configured mappings.
+Sources are CSV (header row, comma-delimited). `path_prefix` is an
+absolute key prefix in the lake bucket, so a source can read any folder
+in the data lake, including folders shared with other pipelines. The
+worker lists every `.csv` file under it and streams them through the
+configured mappings. An upload triggers a run of every pipeline with a
+matching source prefix. Within one pipeline, no source's prefix may be
+nested under another's.
+
+Pipelines provisioned from a template read from their own folder
+(`pipelines/<slug>/transactions/` for the spending template); that is a
+convention, not a requirement.
 
 ## Lookup mappings
 
@@ -68,7 +76,6 @@ interface Mapping {
   name: string;
   source_container_id: string;
   analytic_table_id: string;
-  partition_by?: { column: string; granularity: "day" | "month" | "year" };
   columns: { name: string; expr: AstNode }[];
 }
 ```
@@ -82,6 +89,7 @@ common nodes:
 | `num` | `{ kind: "num", value }` | Numeric literal. |
 | `str` | `{ kind: "str", value }` | String literal. |
 | `parse_date` | `{ kind: "parse_date", input, format }` | Parse a string with a strftime-style format. |
+| `year` / `month` / `day` | `{ kind: "year", input }` | Date part of a date input, as int64 (month 1 to 12, day 1 to 31). |
 | `cast` | `{ kind: "cast", input, to }` | Cast to `int64`, `float64`, `string`. |
 | `upper` / `lower` / `trim` | `{ kind: "upper", input }` | Case folding / whitespace strip. |
 | `mul` / `add` / `sub` / `div` | `{ kind: "mul", left, right }` | Numeric ops. |
@@ -125,11 +133,35 @@ interface AnalyticTable {
   name: string;
   output_prefix: string;     // e.g. "transactions/"
   schema: ColumnSchema[];    // the columns the dashboard / table view will see
+  partition_keys?: string[]; // hive path segments, in order; max 2, no floats
+  dedup_keys?: string[];     // row identity; duplicate tuples collapse to one
 }
 ```
 
-If the matching `mapping.partition_by` is set, the worker writes Hive-style
-partitioned Parquet (`year=2025/month=03/data.parquet`).
+### Partitioning
+
+`partition_keys` names schema columns, and the worker writes one
+Hive-style path segment per key, in order:
+`transactions/year=2026/month=9/<mapping_id>.parquet`. Key columns are
+not written into the Parquet payload; DuckDB re-materializes them from
+the path on read. Any non-float column type is a legal key: partition
+by account or category the same way as by date parts. A null in a key
+column fails the mapping (wrap the expression in `coalesce` to supply a
+default).
+
+Monthly partitioning is two ordinary columns computed by the mapping:
+`year: year(parse_date(date, "%Y-%m-%d"))` and `month: month(...)`,
+listed as `partition_keys: ["year", "month"]`.
+
+### Deduplication
+
+`dedup_keys` declares which columns identify a row. After the mapping
+evaluates (and assertions pass), rows sharing a key tuple collapse to
+one; the first in ingest order survives, and the dropped count is
+reported on the job record as `rows_deduped`. Overlapping CSV
+re-exports collapse naturally because every run re-reads the whole
+source prefix. Two different mappings writing one table are not
+deduplicated against each other.
 
 ## Worked example
 
@@ -141,7 +173,7 @@ The Spending Tracker template ships with this shape:
   "source_containers": [{
     "id": "transactions_raw",
     "name": "Transactions",
-    "path_prefix": "transactions/",
+    "path_prefix": "pipelines/spending/transactions/",
     "schema": [
       { "name": "date", "type": "string" },
       { "name": "description", "type": "string" },
@@ -165,7 +197,6 @@ The Spending Tracker template ships with this shape:
     "name": "Transactions Mapping",
     "source_container_id": "transactions_raw",
     "analytic_table_id": "transactions",
-    "partition_by": { "column": "date", "granularity": "month" },
     "columns": [
       { "name": "date",
         "expr": { "kind": "parse_date",
@@ -184,7 +215,17 @@ The Spending Tracker template ships with this shape:
         "expr": { "kind": "lookup_ref",
                   "lookup_id": "categories",
                   "input": { "kind": "upper",
-                             "input": { "kind": "col", "name": "description" } } } }
+                             "input": { "kind": "col", "name": "description" } } } },
+      { "name": "year",
+        "expr": { "kind": "year",
+                  "input": { "kind": "parse_date",
+                             "input": { "kind": "col", "name": "date" },
+                             "format": "%Y-%m-%d" } } },
+      { "name": "month",
+        "expr": { "kind": "month",
+                  "input": { "kind": "parse_date",
+                             "input": { "kind": "col", "name": "date" },
+                             "format": "%Y-%m-%d" } } }
     ]
   }],
   "analytic_tables": [{
@@ -196,8 +237,11 @@ The Spending Tracker template ships with this shape:
       { "name": "description", "type": "string" },
       { "name": "amount", "type": "float64" },
       { "name": "account", "type": "string" },
-      { "name": "category", "type": "string" }
-    ]
+      { "name": "category", "type": "string" },
+      { "name": "year", "type": "int64" },
+      { "name": "month", "type": "int64" }
+    ],
+    "partition_keys": ["year", "month"]
   }]
 }
 ```
