@@ -68,8 +68,10 @@ WHERE account = coalesce($account, account)
               AND coalesce($period_to,   DATE '9999-12-31')
 ```
 
-Referencing a `$param` no filter declares fails validation. `dropdown`
-filters require `options_sql`, which must return exactly one column.
+Parameters do not require a filter: an undeclared `$param` binds NULL
+(harmless with the `coalesce` idiom) and can be driven by a panel's
+`emit`. `dropdown` filters require `options_sql`, which must return
+exactly one column.
 
 ## Panel kinds and bindings
 
@@ -141,10 +143,12 @@ share node names; self-links and cycle-closing links are skipped:
 
 ### Click-to-filter (emit)
 
-Bar and doughnut panels may declare `emit: { param: <name> }`, where
-the name is a `dropdown` filter's. Clicking a bar or segment sets that
+Bar and doughnut panels may declare `emit: { param: <name> }`. The
+parameter needs no filter declaration: with a matching `dropdown`
+filter the two stay in sync; without one, an active emit shows as a
+dismissible pill in the filter bar. Clicking a bar or segment sets the
 parameter to the clicked label (clicking again clears it), re-running
-the dashboard exactly as if the dropdown changed. The active mark is
+the dashboard exactly as if a filter changed. The active mark is
 outlined and others dim. For the click to have an effect, panel
 queries must use the parameter:
 
@@ -193,7 +197,7 @@ to navigation until published. Publishing validates:
 - every query is a single read-only SELECT that plans against the
   warehouse (checked with `DESCRIBE`, no data read)
 - every binding names a column its query returns
-- every `$param` is declared by a filter; every `query_id` resolves
+- every `query_id` resolves; `emit` is restricted to bar and doughnut
 
 Invalid configs cannot be published. Published saves re-validate.
 
