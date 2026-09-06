@@ -76,9 +76,9 @@ filters require `options_sql`, which must return exactly one column.
 | kind             | required bindings              | optional                                  |
 | ---------------- | ------------------------------ | ----------------------------------------- |
 | `kpi`            | `value`                        | `format` (`number`/`currency`/`raw`), `currency`, `icon` (`dollar`/`chart`/`shapes`/`calendar`) |
-| `bar`            | `x`, `y`                       | `series`, `horizontal`                    |
+| `bar`            | `x`, `y`                       | `series`, `horizontal`, `emit`            |
 | `line`           | `x`, `y`                       | `series`                                  |
-| `doughnut`       | `label`, `value`               |                                           |
+| `doughnut`       | `label`, `value`               | `emit`                                    |
 | `table`          | (none: renders all columns)    | `columns`, `page_size`                    |
 | `sankey`         | `source`, `target`, `value`    |                                           |
 | `choropleth_map` | `region`, `value`              |                                           |
@@ -137,6 +137,32 @@ share node names; self-links and cycle-closing links are skipped:
   source: src
   target: dst
   value: total
+```
+
+### Click-to-filter (emit)
+
+Bar and doughnut panels may declare `emit: { param: <name> }`, where
+the name is a `dropdown` filter's. Clicking a bar or segment sets that
+parameter to the clicked label (clicking again clears it), re-running
+the dashboard exactly as if the dropdown changed. The active mark is
+outlined and others dim. For the click to have an effect, panel
+queries must use the parameter:
+
+```yaml
+filters:
+  - name: category
+    kind: dropdown
+    options_sql: SELECT DISTINCT category FROM transactions ORDER BY 1
+panels:
+  - kind: doughnut
+    title: By category
+    query: |
+      SELECT category, sum(amount) AS total FROM transactions
+      WHERE category = coalesce($category, category)
+      GROUP BY 1
+    label: category
+    value: total
+    emit: { param: category }
 ```
 
 ### Gap filling
