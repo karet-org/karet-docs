@@ -39,8 +39,13 @@ there is no setup or password-change endpoint. See
 | `GET /api/p/[pipeline]/config` | Fetch `pipeline.json`. Returns the parsed body and the S3 ETag in a `Last-Modified` style header. |
 | `PUT /api/p/[pipeline]/config` | Replace `pipeline.json`. Honors `If-Match: <etag>` for optimistic concurrency. |
 | `POST /api/p/[pipeline]/validate` | Forward to the worker's `/config/validate`. |
-| `GET /api/p/[pipeline]/dashboards` | List dashboard names. |
-| `GET /api/p/[pipeline]/dashboards/[name]` | Fetch a single dashboard config. |
+| `GET /api/p/[pipeline]/dashboards` | List published dashboards and drafts. |
+| `POST /api/p/[pipeline]/dashboards` | Create a draft from the v2 YAML template. |
+| `GET /api/p/[pipeline]/dashboards/[name]` | Fetch a dashboard's YAML (`?draft=1` for the draft). |
+| `PUT /api/p/[pipeline]/dashboards/[name]` | Save YAML (`?draft=1` skips validation). |
+| `DELETE /api/p/[pipeline]/dashboards/[name]` | Delete draft and published objects. |
+| `POST /api/p/[pipeline]/dashboards/[name]/publish` | Validate a draft (schema, bindings, SQL) and publish it. |
+| `POST /api/p/[pipeline]/dashboards/[name]/data` | Run all panel queries with filter params; returns per-panel results. |
 | `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, file count. |
 | `GET /api/p/[pipeline]/tables/[table]/rows` | The table's rows, read from the warehouse with DuckDB `read_parquet`. |
 | `POST /api/p/[pipeline]/query` | Body `{ sql }`. Runs SQL against the pipeline's warehouse tables (each exposed as a DuckDB relation over its Parquet). Returns `{ columns, rows }`. |

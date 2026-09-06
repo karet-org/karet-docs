@@ -95,7 +95,7 @@ lines up across the three buckets:
 
 ```
 karet-pipelines  pipelines/<slug>/pipeline.json          # sources + mappings + tables
-                 pipelines/<slug>/dashboards/*.json       # one per dashboard
+                 pipelines/<slug>/dashboards/*.yaml       # one per dashboard
                  pipelines/<slug>/queries/*.json          # one per saved query
                  pipelines/<slug>/jobs/job-<ts>-<rand>.json  # terminal job records
                  pipelines/<slug>/preview.png             # home-page thumbnail

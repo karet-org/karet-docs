@@ -59,7 +59,7 @@ get `429` with a `Retry-After` header.
 There is no machine-readable HTTP API for Karet. The endpoints under
 `/api/*` exist solely to back the browser UI and are not a public
 contract, they require a session cookie. For automation, talk directly
-to the S3 store: pipelines, dashboards, and jobs all live as JSON /
+to the S3 store: pipelines, dashboards, and jobs all live as JSON / YAML /
 Parquet objects under `pipelines/<slug>/`.
 
 ## What's stored where

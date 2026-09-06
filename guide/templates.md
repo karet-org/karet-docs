@@ -35,7 +35,7 @@ A worked example covering the full feature set:
   (Total Spending in CAD, Transactions count, Top Category), a category
   doughnut, a vertical Monthly Spending bar (`x_bin: "month"`), a
   horizontal Top 10 Merchants bar grouped by `merchant`, and a paginated
-  transactions table. The dashboard's `where` clause excludes
+  transactions table. The dashboards' SQL excludes
   `TRANSFER`, `INVESTMENT`, and `INCOME` rows.
 - **Dashboard** `Cash Flow` shows a Sankey of `description → account →
   category` (income sources flow into accounts, accounts flow out to
@@ -63,7 +63,7 @@ export const TEMPLATES: Record<TemplateId, Template> = {
     description: "What this provisions.",
     files: {
       "pipeline.json": yourPipeline,
-      "dashboards/your_dashboard.json": yourDashboard,
+      "dashboards/your_dashboard.yaml": yourDashboardYaml,
     },
     rawFiles: {
       // optional plain-text seed data, e.g. a sample CSV.
