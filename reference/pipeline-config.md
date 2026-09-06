@@ -131,7 +131,6 @@ Where the worker writes Parquet output.
 interface AnalyticTable {
   id: string;
   name: string;
-  output_prefix: string;     // e.g. "transactions/"
   schema: ColumnSchema[];    // the columns the dashboard / table view will see
   partition_keys?: string[]; // hive path segments, in order; max 2, no floats
   dedup_keys?: string[];     // row identity; duplicate tuples collapse to one
@@ -231,7 +230,6 @@ The Spending Tracker template ships with this shape:
   "analytic_tables": [{
     "id": "transactions",
     "name": "Transactions",
-    "output_prefix": "transactions/",
     "schema": [
       { "name": "date", "type": "date" },
       { "name": "description", "type": "string" },
