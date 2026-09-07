@@ -31,6 +31,18 @@
 
   /* Inline code chips pick up a subtle warm tint. */
   --vp-code-bg: #fff5e8;
+
+  /* Buttons default to pale brand-3, which reads washed out with white
+     text; pin them to the primary carrot. */
+  --vp-button-brand-bg: #ff6b35;
+  --vp-button-brand-hover-bg: #ff8455;
+  --vp-button-brand-active-bg: #e85a25;
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-hover-text: #ffffff;
+  --vp-button-brand-active-text: #ffffff;
 }
 
 .dark {
