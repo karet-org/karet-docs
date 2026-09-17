@@ -202,7 +202,7 @@ your network is shared.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `S3_BUCKET_PIPELINES` | `karet-pipelines` | Bucket for configs, dashboards, and job records. |
-| `S3_BUCKET_LAKE` | `karet-lake` | Bucket for raw CSVs. |
+| `S3_BUCKET_LAKE` | `karet-lake` | Bucket for raw source files. |
 | `S3_BUCKET_WAREHOUSE` | `karet-warehouse` | Bucket for partitioned Parquet output. |
 | `AWS_ENDPOINT_URL` | `http://rustfs:9000` | S3 endpoint URL. Set to `https://s3.<region>.amazonaws.com` to swap out RustFS for real AWS. |
 | `AWS_ACCESS_KEY_ID` | `rustfsadmin` | S3 access key. |
