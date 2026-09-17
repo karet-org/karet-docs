@@ -24,6 +24,10 @@ features:
     details: Dimensions join small reference tables onto rows, exact or by keyword; row filters drop what you don't want stored.
   - title: Auto-runs on upload
     details: Drop a file into the bucket and a webhook kicks off a debounced pipeline run.
-  - title: Single-operator by design
-    details: One password-protected admin, scrypt-hashed at OWASP cost. Multi-user accounts and roles are not built yet.
+  - title: Accounts and roles
+    details: Named accounts with viewer, editor and admin. A password or role change signs that person out, nobody else.
+  - title: Versioned, atomically
+    details: Every run publishes by flipping a pointer, so a query never sees a half-written table. Query a table as of an earlier version, or roll it back.
+  - title: Attributed config changes
+    details: Every save records who made it and what changed, with a diff that ignores layout noise and a one-click restore.
 ---
