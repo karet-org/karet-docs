@@ -3,7 +3,7 @@ import { withMermaid } from "vitepress-plugin-mermaid";
 
 export default withMermaid(defineConfig({
   title: "Karet",
-  description: "Self-hostable analytics platform: pipelines, dashboards, S3.",
+  description: "Self-hosted ETL and dashboards: pipelines, DuckDB panels, S3.",
   cleanUrls: true,
   lastUpdated: true,
   // Don't publish the package-local README.md (developer-facing notes)
@@ -34,7 +34,8 @@ export default withMermaid(defineConfig({
             { text: "Architecture", link: "/guide/architecture" },
             { text: "Templates", link: "/guide/templates" },
             { text: "Auto-runs (webhooks)", link: "/guide/webhooks" },
-            { text: "Authentication", link: "/guide/authentication" },
+            { text: "Authentication and roles", link: "/guide/authentication" },
+            { text: "Versions and history", link: "/guide/versions" },
           ],
         },
       ],

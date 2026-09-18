@@ -72,7 +72,7 @@ template. This provisions:
 
 - A source container at `pipelines/<slug>/transactions/` that expects
   `date, description, amount, account` CSVs.
-- A keyword-lookup mapping that tags each row with a category.
+- A dimension that tags each row with a category by keyword match.
 - An analytic table written to `pipelines/<slug>/transactions/` as
   partitioned Parquet.
 - A dashboard with KPI tiles, a category doughnut, a monthly-trend line,

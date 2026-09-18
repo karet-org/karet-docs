@@ -58,7 +58,7 @@ trigger, enqueued_at }`. For each claimed job the worker:
    cluster-wide; lock-busy jobs defer and retry).
 2. Validates the config; an invalid config fails the job without retry.
 3. With `clean_run: true`, deletes existing table output first so
-   removed CSVs don't leave stale partitions. The default is
+   removed source files don't leave stale partitions. The default is
    incremental: re-runs overwrite partitions in place (idempotent).
 4. Streams progress into `karet:jobs:live:<id>` (stage, file and
    mapping counters, partitions written).
@@ -77,7 +77,7 @@ All required unless noted; the worker fails fast if any is missing.
 | Variable | Purpose |
 |----------|---------|
 | `S3_BUCKET_PIPELINES` | Bucket for pipeline configs (default `karet-pipelines`). |
-| `S3_BUCKET_LAKE` | Bucket for raw CSVs (default `karet-lake`). |
+| `S3_BUCKET_LAKE` | Bucket for raw source files (default `karet-lake`). |
 | `S3_BUCKET_WAREHOUSE` | Bucket for Parquet output (default `karet-warehouse`). |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | S3 credentials. |
 | `AWS_ENDPOINT_URL` | S3 endpoint URL (e.g. `http://rustfs:9000` for local dev). |

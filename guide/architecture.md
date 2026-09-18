@@ -7,7 +7,7 @@ hold all durable data, and a Valkey instance coordinates the job queue.
 |---------|-------|------|
 | **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Hosts the three Karet buckets and posts upload events to the worker, which routes each event to every pipeline whose source prefix matches the uploaded key. |
 | **valkey** | [Valkey](https://valkey.io) | Job queue (Redis stream), live job state, and webhook debounce. Coordination only. Losing it never loses history. |
-| **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests source CSVs, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
+| **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests CSV and NDJSON sources, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |
 
 ```mermaid
@@ -46,7 +46,7 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
 2. **Claim.** A worker claims the message via a consumer group, takes a
    per-pipeline lock (`SET NX` with heartbeat renewal) so at most one
    run per pipeline executes cluster-wide, and marks the job `running`.
-3. **Execute.** The config is validated, CSVs ingested, and progress
+3. **Execute.** The config is validated, source files ingested, and progress
    (stage, file/mapping counters) streamed into the live hash. The Jobs
    page polls it.
 4. **Finish.** The worker writes the terminal record to S3
@@ -73,7 +73,7 @@ policies per bucket.
 | Bucket | Env var | Holds |
 |--------|---------|-------|
 | `karet-pipelines` | `S3_BUCKET_PIPELINES` | Pipeline configs, dashboards, saved queries, job records. |
-| `karet-lake` | `S3_BUCKET_LAKE` | Raw CSV files you upload. |
+| `karet-lake` | `S3_BUCKET_LAKE` | Raw source files you upload: CSV, or JSON lines. |
 | `karet-warehouse` | `S3_BUCKET_WAREHOUSE` | Query-ready partitioned Parquet. |
 
 ## Design notes
