@@ -14,8 +14,8 @@ hero:
       link: https://github.com/karet-org/karet
 
 features:
-  - title: Four small services
-    details: A Next.js web UI, a Rust/Axum worker, an S3-compatible object store, and a Valkey job queue. No database server, every byte of durable state lives in the buckets.
+  - title: Five small services
+    details: A Next.js web UI, a Rust/Axum worker, an S3-compatible object store, a Valkey job queue and Postgres. Accounts, config versions and job history are rows; your data stays in the buckets.
   - title: SQL-driven dashboards
     details: Every panel is a DuckDB query in a YAML config, edited in-app with autocomplete and inline validation. Click a chart to filter the rest.
   - title: CSV and JSON logs
