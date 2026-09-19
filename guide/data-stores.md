@@ -4,7 +4,7 @@ Karet keeps two kinds of state, in two places, on purpose.
 
 **Postgres** holds the control plane: accounts and sessions, the pipeline
 registry, config versions, and job history. These need constraints, indexes and
-transactions — a unique username, one live config version per pipeline, "how
+transactions: a unique username, one live config version per pipeline, and "how
 often did runs fail last month" as a query rather than a scan.
 
 **S3** holds the data plane and the documents you edit: raw files in the lake,
@@ -38,8 +38,9 @@ saving partway through a run left the result unattributable. Now the queue
 message carries a config version id: the run uses exactly that version, and its
 job row records which one. Saving during a run cannot change what the run did.
 
-Runs triggered by an upload are the exception — an S3 event knows a prefix, not a
-version — so those resolve whichever version is live when execution starts.
+Runs triggered by an upload are the exception, because an S3 event knows a prefix
+rather than a version, so those resolve whichever version is live when execution
+starts.
 
 ## Migrations
 
