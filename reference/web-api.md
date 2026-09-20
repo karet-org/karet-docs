@@ -54,7 +54,7 @@ reset does not, and signs the caller out. All `422`.
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/settings` | Workspace UI settings (display name, workspace name, starred pipelines). |
+| `GET /api/settings` | Workspace UI settings (workspace name, starred pipelines). |
 | `PUT /api/settings` | Replace the settings document (input sanitized). |
 | `GET /api/lake?prefix=` | One level of the lake bucket: folders and files. |
 | `PUT /api/lake?key=` | Upload one file (validated key, 100 MB cap). CSVs under a pipeline prefix trigger a debounced run. |
