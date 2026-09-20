@@ -275,5 +275,5 @@ Redis-compatible endpoint such as ElastiCache for Valkey).
 
 - [Getting started](./getting-started), build a Spending Tracker pipeline
   end to end.
-- [Architecture](./architecture), the four services and how they connect.
+- [Architecture](./architecture), the services and how they connect.
 - [Authentication](./authentication), env-based credential and password rotation.

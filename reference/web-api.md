@@ -33,6 +33,21 @@ there is no setup or password-change endpoint. See
 | `DELETE /api/pipelines/[slug]` | Delete every object under `pipelines/<slug>/` across all three buckets. |
 | `PATCH /api/pipelines/[slug]` | Body `{ newSlug }`. Renames by copy-then-delete across all three buckets. |
 
+## Accounts
+
+Admin only, including the reads.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/users` | Accounts, with role and whether each came from the environment. |
+| `POST /api/users` | Body `{ username, password, role }`. Creates an account. `422` for a username outside 3 to 32 letters, numbers, underscores or dots, a password under 8 characters, or an unknown role; `409` if the name is taken. |
+| `GET /api/users/[username]` | What deleting the account would cost: `{ ownedPipelines }`. |
+| `PATCH /api/users/[username]` | Body `{ role }`. Changes the role and signs that person out. |
+| `DELETE /api/users/[username]` | Deletes the account. |
+
+`PATCH` and `DELETE` refuse the bootstrap admin (`bootstrap_admin`) and the
+caller's own account (`self_role_change`, `self_delete`), both `422`.
+
 ## Workspace
 
 | Endpoint | Purpose |
@@ -116,5 +131,7 @@ Common codes:
 | `not_found` | Also returned instead of `403` for a members-only pipeline the caller is not on, so its existence is not leaked. |
 | `stale_config` | `412`. The config moved on since the editor loaded it. |
 | `owner_access_is_permanent` | `422`. The owner cannot be removed from the member list or set below admin; transfer the pipeline instead. |
+| `bootstrap_admin` | `422`. That account comes from the environment and is restored on restart. |
+| `self_role_change`, `self_delete` | `422`. An admin cannot demote or delete the account they are signed in as. |
 | `not_owner` | `403`. Only the owner or an instance admin may transfer a pipeline. |
 | `query_error` | `400`. SQL failed. A table the pipeline configures but has never run reads "has no data yet. Run the pipeline to load it." |

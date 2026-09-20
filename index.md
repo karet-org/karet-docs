@@ -14,20 +14,22 @@ hero:
       link: https://github.com/karet-org/karet
 
 features:
-  - title: Five small services
-    details: A Next.js web UI, a Rust/Axum worker, an S3-compatible object store, a Valkey job queue and Postgres. Accounts, config versions and job history are rows; your data stays in the buckets.
-  - title: SQL-driven dashboards
-    details: Every panel is a DuckDB query in a YAML config, edited in-app with autocomplete and inline validation. Click a chart to filter the rest.
-  - title: CSV and JSON logs
-    details: Point a source at a bucket prefix. NDJSON reads log shippers' native output, with dotted paths, record filters and epoch timestamps.
-  - title: Enrich and filter at ingest
-    details: Dimensions join small reference tables onto rows, exact or by keyword; row filters drop what you don't want stored.
-  - title: Auto-runs on upload
-    details: Drop a file into the bucket and a webhook kicks off a debounced pipeline run.
-  - title: Accounts and roles
-    details: Named accounts with viewer, editor and admin. A password or role change signs that person out, nobody else.
-  - title: Versioned, atomically
-    details: Every run publishes by flipping a pointer, so a query never sees a half-written table. Query a table as of an earlier version, or roll it back.
-  - title: Attributed config changes
-    details: Every save records who made it and what changed, with a diff that ignores layout noise and a one-click restore.
+  - title: Pipelines you can see
+    details: >-
+      Point a source at a bucket prefix and build the path from file to table in a
+      graph. CSV or NDJSON in, dimensions to enrich rows, filters to drop what you
+      will not store, and an upload can trigger the run.
+  - title: Dashboards are SQL
+    details: >-
+      Every panel is a DuckDB query in a YAML config, edited in-app with
+      autocomplete and inline validation. Click a chart to filter the rest.
+  - title: Nothing overwrites anything
+    details: >-
+      A run publishes by flipping one pointer, so a query never sees a half-written
+      table. Read a table as of an earlier version or roll it back, and every config
+      save records who changed what.
+  - title: Yours, and shared on purpose
+    details: >-
+      Runs on your machines with your data in your buckets. New pipelines are
+      invite-only, and an admin manages accounts and per-pipeline access in the app.
 ---

@@ -31,8 +31,31 @@ replace their password.
 
 ## Team accounts
 
-Everyone else is a row in Postgres, managed with a script rather than a signup
-form:
+Everyone else is a row in Postgres. There is no signup form: an admin creates
+accounts, on **Settings → People**, which lists who exists, adds an account from a
+username, password and role, changes a role, and deletes an account.
+
+Two things that screen will not do, because they would undo themselves or lock you
+out mid-request:
+
+- The bootstrap admin cannot be deleted or demoted. The environment restores it on
+  the next restart, so the change would appear to work and then revert. Retire it
+  by changing `KARET_ADMIN_USERNAME`.
+- You cannot change or delete your own account. Ask another admin.
+
+A role change applies on the caller's next request and signs them out. The role is
+read from the account row rather than from the session, so a demotion or a deletion
+is effective at once rather than whenever a cached session would have expired.
+
+Deleting an account ends its sessions and drops its per-pipeline grants. Pipelines
+it owned stay, without an owner, and any admin can hand them on; the confirmation
+names them so nobody deletes a colleague and wonders where the work went.
+
+### From a terminal
+
+`scripts/manage-users.mjs` does the same things for an operator who is already at
+a shell, and it is the way back in if every admin account is lost, since the
+bootstrap admin comes from the environment:
 
 ```sh
 node scripts/manage-users.mjs list
@@ -42,13 +65,10 @@ node scripts/manage-users.mjs set-password erin
 node scripts/manage-users.mjs remove erin
 ```
 
-The script writes rows directly because it is an operator tool with no HTTP
-server to talk to. If you are coming from a pre-Postgres instance, a one-off
-`node scripts/manage-users.mjs import-s3` brings accounts over from the old
-`_auth/users.json`.
-
-Changing a role or a password deletes that account's sessions, so a demotion
-takes effect on the next request rather than whenever a cookie expires.
+**Resetting a forgotten password is CLI-only**, with `set-password`; the app has no
+password-reset screen, since Karet sends no mail. If you are coming from a
+pre-Postgres instance, a one-off `node scripts/manage-users.mjs import-s3` brings
+accounts over from the old `_auth/users.json`.
 
 ## Roles
 

@@ -1,7 +1,8 @@
 # Architecture
 
-Karet is four services orchestrated by Docker Compose: three S3 buckets
-hold all durable data, and a Valkey instance coordinates the job queue.
+Karet is a web app, a worker, and the three stores they share, orchestrated by
+Docker Compose. Postgres holds the control plane, three S3 buckets hold the data,
+and Valkey coordinates the job queue.
 
 | Service | Stack | Role |
 |---------|-------|------|
