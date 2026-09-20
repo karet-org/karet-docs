@@ -12,35 +12,47 @@ and Valkey coordinates the job queue.
 | **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests CSV and NDJSON sources, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |
 
+One diagram for who calls whom, and a table for who writes what. Trying to draw
+both at once produced thirteen crossing arrows and told you less.
+
 ```mermaid
-%%{ init: { "flowchart": { "nodeSpacing": 45, "rankSpacing": 60, "wrappingWidth": 220 } } }%%
-flowchart TB
-  web["karet (Next.js) :3000"]
-  valkey[("valkey<br/>queue + live state")]
-  worker["karet-worker<br/>Rust / Axum / Polars"]
-  postgres[("postgres<br/>control plane")]
+%%{ init: { "flowchart": { "nodeSpacing": 60, "rankSpacing": 70 } } }%%
+flowchart LR
+  web["karet<br/>Next.js :3000"]
+  worker["karet-worker<br/>Rust / Axum / Polars :8080"]
+  valkey[("valkey")]
+  rustfs[("rustfs<br/>S3 API :9000")]
+  postgres[("postgres")]
 
-  subgraph s3["rustfs (S3 API) :9000"]
-    pipelines[("karet-pipelines")]
-    lake[("karet-lake")]
-    warehouse[("karet-warehouse")]
-  end
+  web -->|"validate a config"| worker
+  web -->|"enqueue a run"| valkey
+  valkey -->|"claim"| worker
+  worker -->|"progress, locks"| valkey
+  rustfs -->|"object-put event"| worker
 
-  web -->|"enqueue job"| valkey
-  web -->|"live status"| valkey
-  web -->|"validate config"| worker
-  web -->|"accounts, configs, jobs"| postgres
-  web -->|"dashboards, queries, settings"| pipelines
-  web -->|"browse + upload"| lake
-  web -->|"query Parquet, restore a version"| warehouse
-
-  valkey -->|"claim job"| worker
-  worker -->|"progress + live state"| valkey
-  worker -->|"pinned config, job rows"| postgres
-  worker -->|"raw data"| lake
-  worker -->|"Parquet + manifests"| warehouse
-  s3 -->|"object-put event"| worker
+  web <--> postgres
+  worker <--> postgres
+  web <--> rustfs
+  worker <--> rustfs
 ```
+
+The web is the only service a browser reaches. The worker is reachable only on the
+compose network, and the two speak just once: a config is validated by the worker
+before the web publishes it. Everything else between them goes through a store.
+
+## Who writes what
+
+| Store | Holds | Written by | Read by |
+|-------|-------|-----------|---------|
+| **postgres** | accounts, sessions, pipeline registry, config versions, job rows | web (everything but job rows, and it owns migrations), worker (job rows) | both |
+| **valkey** | job stream, live job state, per-pipeline run locks, upload debounce | web (enqueue), worker (claim, progress, locks, its own debounced enqueues) | both |
+| **karet-lake** | raw CSV and NDJSON you upload | web (the Data lake browser uploads, moves, deletes) | worker |
+| **karet-warehouse** | partitioned Parquet, per-table manifests, the `_current.json` pointer | worker (a run publishes), web (a restore publishes) | both |
+| **karet-pipelines** | dashboard YAML, saved queries, thumbnails, workspace settings | web | web |
+
+Two rows are worth reading twice. Postgres is the only store where each table has
+exactly one writer. The warehouse has two publishers, and only the worker takes the
+per-pipeline lock, so a restore during a run is a race on the same version counter.
 
 ## The job queue
 
