@@ -69,9 +69,9 @@ the username, their role, and a fingerprint of their credential. Sessions last
 7 days.
 
 `cv` is what makes revocation immediate. Changing a password or a role changes
-that user's fingerprint, so their outstanding sessions stop verifying on the
-next request — without signing anybody else out. Deleting an account has the
-same effect. Rotating `KARET_SESSION_SECRET` invalidates every session at once.
+that user's fingerprint, so their outstanding sessions stop verifying on the next
+request, and nobody else is signed out. Deleting an account has the same effect.
+Rotating `KARET_SESSION_SECRET` invalidates every session at once.
 
 ## Automation and CI
 
