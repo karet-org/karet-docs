@@ -33,7 +33,16 @@ there is no setup or password-change endpoint. See
 | `DELETE /api/pipelines/[slug]` | Delete every object under `pipelines/<slug>/` across all three buckets. |
 | `PATCH /api/pipelines/[slug]` | Body `{ newSlug }`. Renames by copy-then-delete across all three buckets. |
 
-## Accounts
+## Your own account
+
+Any signed-in role. The username comes from the session, so this route only ever
+addresses the caller.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `PATCH /api/account` | Body `{ displayName }` or `{ currentPassword, newPassword }`. A blank display name clears it. A password change needs the current one: `403 wrong_password` if it does not match, and it ends every session. |
+
+## Other people's accounts
 
 Admin only, including the reads.
 
@@ -55,7 +64,7 @@ reset does not, and signs the caller out. All `422`.
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /api/settings` | Workspace UI settings (workspace name, starred pipelines). |
-| `PUT /api/settings` | Replace the settings document (input sanitized). |
+| `PUT /api/settings` | Admin. Replaces the settings document, input sanitized. The workspace name is an instance setting, not a personal one. |
 | `GET /api/lake?prefix=` | One level of the lake bucket: folders and files. |
 | `PUT /api/lake?key=` | Upload one file (validated key, 100 MB cap). CSVs under a pipeline prefix trigger a debounced run. |
 | `POST /api/lake` | Body `{ from, to }`. Move an object (copy then delete). |

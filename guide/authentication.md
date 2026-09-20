@@ -37,6 +37,18 @@ password and role, changes a role, resets a password, and deletes an account. Th
 can be as many admins as you like, and a team of any size wants at least two, since
 nobody can change their own role.
 
+Each person owns two things about their own account, on **Settings → Your account**:
+
+- **Display name.** What they are called in the sidebar and in the People table.
+  Blank reads back as the username, so there is always something to show.
+- **Their password.** Changing it needs the current one, because a session somebody
+  else has picked up can already act as them, and without that proof it could also
+  lock them out. Every session ends, including the one making the change.
+
+The bootstrap admin cannot change its own password here either: the environment
+sets it on every start. The workspace name is an instance setting, so that card is
+admin-only.
+
 Two things that screen will not do, because they would undo themselves or lock you
 out mid-request:
 
