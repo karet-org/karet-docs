@@ -13,12 +13,12 @@ and Valkey coordinates the job queue.
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |
 
 ```mermaid
-%%{ init: { "flowchart": { "nodeSpacing": 55, "rankSpacing": 70 } } }%%
+%%{ init: { "flowchart": { "nodeSpacing": 45, "rankSpacing": 60, "wrappingWidth": 220 } } }%%
 flowchart TB
   web["karet (Next.js) :3000"]
-  postgres[("postgres (control plane)")]
-  valkey[("valkey (queue + live state)")]
-  worker["karet-worker (Rust / Axum / Polars)"]
+  valkey[("valkey<br/>queue + live state")]
+  worker["karet-worker<br/>Rust / Axum / Polars"]
+  postgres[("postgres<br/>control plane")]
 
   subgraph s3["rustfs (S3 API) :9000"]
     pipelines[("karet-pipelines")]
@@ -26,17 +26,16 @@ flowchart TB
     warehouse[("karet-warehouse")]
   end
 
-  web -->|"accounts, registry, config versions, job history; owns migrations"| postgres
-  web -->|"enqueue job (XADD)"| valkey
-  web -->|"read live status + progress"| valkey
-  web -->|"read dashboards / saved queries"| pipelines
-  web -->|"query Parquet (DuckDB)"| warehouse
+  web -->|"enqueue job"| valkey
+  web -->|"live status"| valkey
+  web -->|"accounts, configs, jobs"| postgres
+  web -->|"dashboards, queries"| pipelines
+  web -->|"query Parquet"| warehouse
 
-  valkey -->|"claim job (consumer group)"| worker
-  worker -->|"read the pinned config version / write job rows"| postgres
-  worker -->|"read raw data"| lake
-  worker -->|"write Parquet + manifests"| warehouse
-
+  valkey -->|"claim job"| worker
+  worker -->|"pinned config, job rows"| postgres
+  worker -->|"raw data"| lake
+  worker -->|"Parquet + manifests"| warehouse
   lake -->|"object-put webhook"| worker
 ```
 
