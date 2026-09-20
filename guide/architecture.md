@@ -28,15 +28,18 @@ flowchart TB
 
   web -->|"enqueue job"| valkey
   web -->|"live status"| valkey
+  web -->|"validate config"| worker
   web -->|"accounts, configs, jobs"| postgres
-  web -->|"dashboards, queries"| pipelines
-  web -->|"query Parquet"| warehouse
+  web -->|"dashboards, queries, settings"| pipelines
+  web -->|"browse + upload"| lake
+  web -->|"query Parquet, restore a version"| warehouse
 
   valkey -->|"claim job"| worker
+  worker -->|"progress + live state"| valkey
   worker -->|"pinned config, job rows"| postgres
   worker -->|"raw data"| lake
   worker -->|"Parquet + manifests"| warehouse
-  lake -->|"object-put webhook"| worker
+  s3 -->|"object-put event"| worker
 ```
 
 ## The job queue
