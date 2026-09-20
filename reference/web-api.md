@@ -42,11 +42,13 @@ Admin only, including the reads.
 | `GET /api/users` | Accounts, with role and whether each came from the environment. |
 | `POST /api/users` | Body `{ username, password, role }`. Creates an account. `422` for a username outside 3 to 32 letters, numbers, underscores or dots, a password under 8 characters, or an unknown role; `409` if the name is taken. |
 | `GET /api/users/[username]` | What deleting the account would cost: `{ ownedPipelines }`. |
-| `PATCH /api/users/[username]` | Body `{ role }`. Changes the role and signs that person out. |
+| `PATCH /api/users/[username]` | Body `{ role }` or `{ password }`. Either change ends that account's sessions. `422` for a password under 8 characters. |
 | `DELETE /api/users/[username]` | Deletes the account. |
 
-`PATCH` and `DELETE` refuse the bootstrap admin (`bootstrap_admin`) and the
-caller's own account (`self_role_change`, `self_delete`), both `422`.
+`PATCH` and `DELETE` refuse the bootstrap admin (`bootstrap_admin`), since the
+environment sets its role and password on every start. A role change and a deletion
+also refuse the caller's own account (`self_role_change`, `self_delete`); a password
+reset does not, and signs the caller out. All `422`.
 
 ## Workspace
 

@@ -31,21 +31,28 @@ replace their password.
 
 ## Team accounts
 
-Everyone else is a row in Postgres. There is no signup form: an admin creates
-accounts, on **Settings → People**, which lists who exists, adds an account from a
-username, password and role, changes a role, and deletes an account.
+Everyone else is a row in Postgres. There is no signup form: an admin does this on
+**Settings → People**, which lists who exists, adds an account from a username,
+password and role, changes a role, resets a password, and deletes an account. There
+can be as many admins as you like, and a team of any size wants at least two, since
+nobody can change their own role.
 
 Two things that screen will not do, because they would undo themselves or lock you
 out mid-request:
 
-- The bootstrap admin cannot be deleted or demoted. The environment restores it on
-  the next restart, so the change would appear to work and then revert. Retire it
-  by changing `KARET_ADMIN_USERNAME`.
-- You cannot change or delete your own account. Ask another admin.
+- The bootstrap admin cannot be deleted, demoted, or given a new password here. The
+  environment sets its role and password on every start, so the change would appear
+  to work and then revert. Retire it by changing `KARET_ADMIN_USERNAME`.
+- You cannot change your own role or delete your own account. Ask another admin.
+  Resetting your own password is allowed, and signs you out.
 
-A role change applies on the caller's next request and signs them out. The role is
-read from the account row rather than from the session, so a demotion or a deletion
-is effective at once rather than whenever a cached session would have expired.
+Changes take effect on the next request, not whenever a cookie expires. The role is
+read from the account row rather than from the session, and better-auth's session
+cookie cache is off, so a demotion, a reset or a deletion is effective at once at
+the cost of one indexed lookup per request.
+
+A reset sets a password and ends that account's sessions. Karet sends no mail, so
+there is no self-service "forgot password": an admin sets a new one and tells them.
 
 Deleting an account ends its sessions and drops its per-pipeline grants. Pipelines
 it owned stay, without an owner, and any admin can hand them on; the confirmation
@@ -53,9 +60,9 @@ names them so nobody deletes a colleague and wonders where the work went.
 
 ### From a terminal
 
-`scripts/manage-users.mjs` does the same things for an operator who is already at
-a shell, and it is the way back in if every admin account is lost, since the
-bootstrap admin comes from the environment:
+`scripts/manage-users.mjs` does the same things for an operator who is already at a
+shell, and it is the way back in if every admin account is lost, since the bootstrap
+admin comes from the environment:
 
 ```sh
 node scripts/manage-users.mjs list
@@ -65,10 +72,9 @@ node scripts/manage-users.mjs set-password erin
 node scripts/manage-users.mjs remove erin
 ```
 
-**Resetting a forgotten password is CLI-only**, with `set-password`; the app has no
-password-reset screen, since Karet sends no mail. If you are coming from a
-pre-Postgres instance, a one-off `node scripts/manage-users.mjs import-s3` brings
-accounts over from the old `_auth/users.json`.
+If you are coming from a pre-Postgres instance, a one-off
+`node scripts/manage-users.mjs import-s3` brings accounts over from the old
+`_auth/users.json`.
 
 ## Roles
 
