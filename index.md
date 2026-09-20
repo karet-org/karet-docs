@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Karet
-  text: Self-hosted ETL and dashboards
-  tagline: Draw the pipeline as a graph, describe the dashboard in YAML, and bring the whole stack up with Docker Compose.
+  text: The self-hosted analytics stack
+  tagline: ETL pipelines you draw as a graph and dashboards you describe in YAML, on hardware you own, up in one Docker Compose file.
   actions:
     - theme: brand
       text: Get started

@@ -19,12 +19,17 @@ uses prebuilt images from GHCR and skips the source checkout.
 git clone https://github.com/karet-org/karet
 cd karet
 
-# Generate a secret used to sign session cookies.
-echo "KARET_SESSION_SECRET=$(openssl rand -base64 48)" > .env
+cat > .env <<EOF
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
+KARET_SESSION_SECRET=$(openssl rand -base64 48)
+KARET_WORKER_TOKEN=$(openssl rand -hex 32)
+KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)
+EOF
 ```
 
-The compose file refuses to start without `KARET_SESSION_SECRET`: a
-default value would let anyone forge a session.
+Compose refuses to start without these, and without your admin password hash:
+run `npm run hash-password` and append the `KARET_ADMIN_PASSWORD_HASH=...` line
+it prints to `.env`. Defaults for any of them would let anyone in.
 
 ## 2. Start the stack
 
@@ -32,12 +37,13 @@ default value would let anyone forge a session.
 docker compose up -d
 ```
 
-Four services come up:
+Five services come up:
 
 | Service | Port | Purpose |
 |---------|------|---------|
 | `web` | `:3000` | Karet's Next.js UI |
-| `worker` | `:8080` | The Rust/Axum pipeline worker |
+| `worker` | `:8080` | The Rust pipeline worker |
+| `postgres` | internal | Accounts, pipelines, config versions, job history |
 | `rustfs` | `:9000` (`:9001` console) | S3-compatible object store |
 | `valkey` | internal | Job queue and live job state |
 
@@ -62,8 +68,9 @@ the RustFS console at <http://localhost:9001>.
 
 ## 4. Sign in
 
-Open <http://localhost:3000> and sign in with the admin password you
-provisioned during [self-hosting setup](./self-hosting#_2-generate-the-secrets).
+Open <http://localhost:3000> and sign in as the admin whose password you hashed
+in step 1. Set your display name or change that password on
+[Settings](./authentication#your-own-account).
 
 Pipelines you create are visible only to you and other instance admins until you
 grant someone access on the pipeline's **Access** page. See

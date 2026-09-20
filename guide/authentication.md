@@ -37,19 +37,7 @@ password and role, changes a role, resets a password, and deletes an account. Th
 can be as many admins as you like, and a team of any size wants at least two, since
 nobody can change their own role.
 
-Each person owns two things about their own account, on **Settings → Your account**:
-
-- **Display name.** What they are called in the sidebar and in the People table.
-  Blank reads back as the username, so there is always something to show.
-- **Their password.** Changing it needs the current one, because a session somebody
-  else has picked up can already act as them, and without that proof it could also
-  lock them out. Every session ends, including the one making the change.
-
-The bootstrap admin cannot change its own password here either: the environment
-sets it on every start. The workspace name is an instance setting, so that card is
-admin-only.
-
-Two things that screen will not do, because they would undo themselves or lock you
+Two things the People screen will not do, because they would undo themselves or lock you
 out mid-request:
 
 - The bootstrap admin cannot be deleted, demoted, or given a new password here. The
@@ -87,6 +75,24 @@ node scripts/manage-users.mjs remove erin
 If you are coming from a pre-Postgres instance, a one-off
 `node scripts/manage-users.mjs import-s3` brings accounts over from the old
 `_auth/users.json`.
+
+## Your own account
+
+Everyone, whatever their role, owns two things about their account on
+**Settings → Your account**:
+
+- **Display name.** What they are called in the sidebar and in lists of people.
+  Letters, numbers, spaces, apostrophes, hyphens and dots, up to 64 characters.
+  Leaving it blank reads back as the username, so there is always something to
+  show.
+- **Their password.** Changing it needs the current one, because a session
+  somebody else has picked up can already act as them, and without that proof it
+  could also lock them out. Every session ends, including the one making the
+  change.
+
+The bootstrap admin is refused a password change here: the environment sets it on
+every start, so it would revert. The workspace name is an instance setting, so
+that card only appears for admins.
 
 ## Roles
 
