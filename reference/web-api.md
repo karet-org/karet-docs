@@ -3,9 +3,7 @@
 The web service (`karet`) hosts both the UI and the JSON API the UI
 talks to. The `/api/*` routes exist solely to back the browser UI and
 require a session cookie, they are not a stable public surface and
-not intended for scripting. For machine-driven workflows, talk
-directly to the S3 store: pipelines, dashboards, and jobs all live as
-JSON / Parquet objects under `pipelines/<slug>/`.
+not intended for scripting.
 
 Every `/api/*` route enforces auth except the explicitly-public ones
 below.
@@ -14,9 +12,12 @@ below.
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
-| `POST /api/auth/login` | public, rate-limited | Body `{ password }`. Sets the session cookie on success; `429` + `Retry-After` when throttled. |
-| `POST /api/auth/logout` | session | Clears the session cookie. |
-| `GET /api/auth/me` | session | Returns `{ authenticated: true }`. |
+| `POST /api/auth/sign-in/username` | public, rate-limited | Body `{ username, password }`. Creates a session row and sets the cookie; `429` + `Retry-After` when throttled. |
+| `POST /api/auth/sign-out` | session | Deletes the session row and clears the cookie. |
+| `GET /api/auth/me` | session | Returns `{ authenticated, user: { username, role, service } }`. The **instance** role. |
+
+`/api/auth/*` is [better-auth](https://better-auth.com); the routes above are the
+ones the UI uses.
 
 The admin credential is provisioned via `KARET_ADMIN_PASSWORD_HASH`;
 there is no setup or password-change endpoint. See
@@ -48,8 +49,15 @@ there is no setup or password-change endpoint. See
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/p/[pipeline]/config` | Fetch `pipeline.json`. Returns the parsed body and the S3 ETag in a `Last-Modified` style header. |
-| `PUT /api/p/[pipeline]/config` | Replace `pipeline.json`. Honors `If-Match: <etag>` for optimistic concurrency. |
+| `GET /api/p/[pipeline]/config` | The live config, with its version in `X-Karet-Config-Version`. |
+| `PUT /api/p/[pipeline]/config` | Save a new version. Send back the version you loaded in `X-Karet-Config-Version`; a save against a stale version is refused with `412 stale_config`. |
+| `GET /api/p/[pipeline]/config/history` | Versions newest first, with author and note. |
+| `GET /api/p/[pipeline]/config/history/[version]` | One version, with its diff against the live config. |
+| `POST /api/p/[pipeline]/config/history/[version]/revert` | Write that version forward as a new one. |
+| `GET /api/p/[pipeline]/role` | The caller's effective role **on this pipeline**, which a membership or ownership may differ from their instance role. Presentation only. |
+| `GET /api/p/[pipeline]/members` | admin here. `{ visibility, owner, members, accounts }`. |
+| `PUT /api/p/[pipeline]/members` | admin here. One of `{ visibility }`, `{ username, role }` or `{ owner }`. Answers with the resulting `{ visibility, owner, members }`. |
+| `DELETE /api/p/[pipeline]/members?username=` | admin here. Revoke a grant. |
 | `POST /api/p/[pipeline]/validate` | Forward to the worker's `/config/validate`. |
 | `GET /api/p/[pipeline]/dashboards` | List published dashboards and drafts. |
 | `POST /api/p/[pipeline]/dashboards` | Create a draft from the v2 YAML template. |
@@ -59,7 +67,7 @@ there is no setup or password-change endpoint. See
 | `DELETE /api/p/[pipeline]/dashboards/[name]` | Delete draft and published objects. |
 | `POST /api/p/[pipeline]/dashboards/[name]/publish` | Validate a draft (schema, bindings, SQL) and publish it. |
 | `POST /api/p/[pipeline]/dashboards/[name]/data` | Run all panel queries with filter params; returns per-panel results. |
-| `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, file count. |
+| `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, file count, live version. `version: 0` means no run has published the table yet, so it is not queryable. |
 | `GET /api/p/[pipeline]/tables/[table]/rows` | The table's rows, read from the warehouse with DuckDB `read_parquet`. |
 | `POST /api/p/[pipeline]/query` | Body `{ sql }`. Runs SQL against the pipeline's warehouse tables (each exposed as a DuckDB relation over its Parquet). Returns `{ columns, rows }`. |
 | `GET /api/p/[pipeline]/queries` | List saved queries (`{ queries: SavedQuery[] }`). |
@@ -78,8 +86,10 @@ the web service. See [Auto-runs](/guide/webhooks) and the
 
 ## Auth shape
 
-The middleware (`middleware.ts`) accepts requests authenticated by the
-`karet_session` cookie set by `/api/auth/login`.
+The middleware (`middleware.ts`) checks only that a session cookie is present.
+Every route then resolves the caller against the pipeline it addresses, because a
+membership or ownership can change the answer and the edge cannot read the
+database. See [per-pipeline access](/guide/authentication#per-pipeline-access).
 
 Only `/api/auth/*` bypasses the middleware; everything else requires a
 valid session cookie.
@@ -103,3 +113,8 @@ Common codes:
 | `dashboard_not_found` | The slug exists but no dashboard at the given name. |
 | `invalid_slug` | The slug failed sanitization. |
 | `already_exists` | Trying to create or rename onto an existing slug. |
+| `not_found` | Also returned instead of `403` for a members-only pipeline the caller is not on, so its existence is not leaked. |
+| `stale_config` | `412`. The config moved on since the editor loaded it. |
+| `owner_access_is_permanent` | `422`. The owner cannot be removed from the member list or set below admin; transfer the pipeline instead. |
+| `not_owner` | `403`. Only the owner or an instance admin may transfer a pipeline. |
+| `query_error` | `400`. SQL failed. A table the pipeline configures but has never run reads "has no data yet. Run the pipeline to load it." |

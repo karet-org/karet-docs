@@ -65,10 +65,14 @@ the RustFS console at <http://localhost:9001>.
 Open <http://localhost:3000> and sign in with the admin password you
 provisioned during [self-hosting setup](./self-hosting#_2-generate-the-secrets).
 
+Pipelines you create are visible only to you and other instance admins until you
+grant someone access on the pipeline's **Access** page. See
+[per-pipeline access](./authentication#per-pipeline-access).
+
 ## 5. Create your first pipeline
 
-From the home page, click **+ New pipeline** and pick the **Spending Tracker**
-template. This provisions:
+From the home page, click **+ New pipeline**. **Blank** is selected by default;
+for this walkthrough pick **Spending Tracker** instead. That provisions:
 
 - A source container at `pipelines/<slug>/transactions/` that expects
   `date, description, amount, account` CSVs.
@@ -90,6 +94,10 @@ aws --endpoint-url=http://localhost:9000 \
 If you've enabled the [auto-run webhook](./webhooks), the upload triggers
 a pipeline run automatically (with a 5-second debounce so a batch upload
 becomes one job). Otherwise click **Run Pipeline** on the **Jobs** page.
+
+Until that first run finishes, the **Data** page says the table has no data yet.
+A table only exists in the warehouse once a run has published it, so there is
+nothing to query before then.
 
 ## 7. View the dashboard
 
