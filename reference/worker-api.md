@@ -62,8 +62,8 @@ trigger, enqueued_at }`. For each claimed job the worker:
    incremental: re-runs overwrite partitions in place (idempotent).
 4. Streams progress into `karet:jobs:live:<id>` (stage, file and
    mapping counters, partitions written).
-5. Writes the terminal record to
-   `pipelines/<slug>/jobs/<job_id>.json` in S3, then acks.
+5. Publishes the table version, updates the job's row in Postgres with its
+   outcome, then acks.
 
 Transient failures (e.g. S3 unreachable) retry with exponential backoff
 up to `MAX_ATTEMPTS`. Jobs whose worker died are reclaimed by another

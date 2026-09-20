@@ -225,9 +225,10 @@ docker compose pull
 docker compose up -d
 ```
 
-The `rustfs-data` and `valkey-data` volumes persist across restarts and
-pulls, so your pipelines, dashboards, job history, and queued jobs all
-survive upgrades.
+The `postgres-data`, `rustfs-data` and `valkey-data` volumes persist across
+restarts and pulls, so your accounts, pipelines, dashboards, job history and
+queued jobs all survive upgrades. `postgres-data` is the one to back up: it holds
+everything that is not a file, and the schema migrates itself on start.
 
 ::: warning Upgrading from ≤ 0.1.x
 0.2.0 changed the architecture: jobs now travel over a Valkey queue, the

@@ -16,6 +16,7 @@ and Valkey coordinates the job queue.
 %%{ init: { "flowchart": { "nodeSpacing": 55, "rankSpacing": 70 } } }%%
 flowchart TB
   web["karet (Next.js) :3000"]
+  postgres[("postgres (control plane)")]
   valkey[("valkey (queue + live state)")]
   worker["karet-worker (Rust / Axum / Polars)"]
 
@@ -25,15 +26,16 @@ flowchart TB
     warehouse[("karet-warehouse")]
   end
 
+  web -->|"accounts, registry, config versions, job history; owns migrations"| postgres
   web -->|"enqueue job (XADD)"| valkey
   web -->|"read live status + progress"| valkey
-  web -->|"read config / dashboards / job history"| pipelines
+  web -->|"read dashboards / saved queries"| pipelines
   web -->|"query Parquet (DuckDB)"| warehouse
 
   valkey -->|"claim job (consumer group)"| worker
-  worker -->|"read config / write job records"| pipelines
+  worker -->|"read the pinned config version / write job rows"| postgres
   worker -->|"read raw data"| lake
-  worker -->|"write Parquet"| warehouse
+  worker -->|"write Parquet + manifests"| warehouse
 
   lake -->|"object-put webhook"| worker
 ```
@@ -51,9 +53,9 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
 3. **Execute.** The config is validated, source files ingested, and progress
    (stage, file/mapping counters) streamed into the live hash. The Jobs
    page polls it.
-4. **Finish.** The worker writes the terminal record to S3
-   (`pipelines/<slug>/jobs/<id>.json`), updates the live hash (24 h
-   TTL), releases the lock, and acks the message.
+4. **Finish.** The worker updates the job's row in Postgres with its outcome,
+   updates the live hash (24 h TTL), releases the lock, and acks the
+   message.
 
 Failures retry with exponential backoff (up to `MAX_ATTEMPTS`, default
 3). If a worker crashes mid-run, its unacked message idles in the
@@ -96,16 +98,19 @@ Each bucket keys objects under `pipelines/<slug>/`, so a pipeline's data
 lines up across the three buckets:
 
 ```
-karet-pipelines  pipelines/<slug>/pipeline.json          # sources + mappings + tables
-                 pipelines/<slug>/dashboards/*.yaml       # one per dashboard
+karet-pipelines  pipelines/<slug>/dashboards/*.yaml       # one per dashboard
                  pipelines/<slug>/queries/*.json          # one per saved query
-                 pipelines/<slug>/jobs/job-<ts>-<rand>.json  # terminal job records
                  pipelines/<slug>/preview.png             # home-page thumbnail
 
 karet-lake       pipelines/<slug>/transactions/*.csv     # raw inputs you upload
 
-karet-warehouse  pipelines/<slug>/<table>/year=YYYY/month=MM/<mapping>.parquet
+karet-warehouse  pipelines/<slug>/<table>/_current.json   # which version is live
+                 pipelines/<slug>/<table>/_manifests/<n>.json
+                 pipelines/<slug>/<table>/v<n>/year=YYYY/month=MM/<mapping>.parquet
 ```
+
+The config itself, the pipeline registry and job history are rows in Postgres, not
+objects here. See [where data lives](./data-stores).
 
 ## Trust boundaries
 

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Karet
   text: Self-hosted ETL and dashboards
-  tagline: Ingest CSV and JSON logs, build pipelines in a visual graph, and chart the results with DuckDB.
+  tagline: Draw the pipeline as a graph, describe the dashboard in YAML, and bring the whole stack up with Docker Compose.
   actions:
     - theme: brand
       text: Get started
@@ -14,22 +14,25 @@ hero:
       link: https://github.com/karet-org/karet
 
 features:
-  - title: Pipelines you can see
+  - title: Pipeline visualization
     details: >-
-      Point a source at a bucket prefix and build the path from file to table in a
-      graph. CSV or NDJSON in, dimensions to enrich rows, filters to drop what you
-      will not store, and an upload can trigger the run.
-  - title: Dashboards are SQL
+      The graph is the editor. Sources, dimensions, mappings and tables are nodes;
+      drag between them to say what feeds what, and the layout is saved with the
+      pipeline so it looks the same to everyone.
+  - title: Config-driven dashboards
     details: >-
-      Every panel is a DuckDB query in a YAML config, edited in-app with
-      autocomplete and inline validation. Click a chart to filter the rest.
-  - title: Nothing overwrites anything
+      A dashboard is a YAML document and every panel is a DuckDB query, edited
+      in-app with autocomplete and inline validation. Click a chart to filter the
+      rest.
+  - title: Pipeline versioning
     details: >-
-      A run publishes by flipping one pointer, so a query never sees a half-written
-      table. Read a table as of an earlier version or roll it back, and every config
-      save records who changed what.
-  - title: Yours, and shared on purpose
+      Every save is a numbered version with an author and a diff against what is
+      live, and a restore writes forward rather than rewinding. Runs are pinned to
+      the version that produced them, and a table can be read as of an earlier
+      version or rolled back to one.
+  - title: Docker Compose and go
     details: >-
-      Runs on your machines with your data in your buckets. New pipelines are
-      invite-only, and an admin manages accounts and per-pipeline access in the app.
+      One compose file brings up the web app, the worker, Postgres, Valkey and an
+      S3-compatible store, from prebuilt images. Generate two secrets and an admin
+      password hash, create three buckets, and that is the install.
 ---
