@@ -180,11 +180,17 @@ worker's own API, so this is not a separate privilege to manage.
 
 ## Login throttling
 
-scrypt verification costs ~128 MiB and ~0.5 s per attempt, so the login
-endpoint is throttled: each client gets a burst of 5 attempts refilling one per
-15 seconds (reset on successful login), and at most 2 verifications run
-concurrently across all clients. Throttled requests get `429` with a
-`Retry-After` header.
+scrypt verification costs ~128 MiB and ~0.5 s per attempt, so an unthrottled
+login endpoint is a denial-of-service lever as well as a brute-force one.
+Better-auth's own limiter handles it: after three failed attempts the endpoint
+answers `429` with `{"message": "Too many requests. Please try again later."}`
+and an `x-retry-after` header in seconds. The window is short, ten seconds by
+default, and it counts requests rather than failures, so a correct password
+during the cooldown is refused too.
+
+Karet carried its own token-bucket for this before better-auth arrived. It was
+deleted rather than left sitting unused, so this section describes the limiter
+that runs.
 
 ## What's stored where
 
