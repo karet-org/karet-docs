@@ -106,10 +106,10 @@ services:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       S3_FORCE_PATH_STYLE: "true"
       KARET_SESSION_SECRET: ${KARET_SESSION_SECRET:?set KARET_SESSION_SECRET (e.g. openssl rand -base64 48)}
+      KARET_ADMIN_USERNAME: ${KARET_ADMIN_USERNAME:-admin}
       KARET_ADMIN_PASSWORD_HASH: ${KARET_ADMIN_PASSWORD_HASH:?generate with `npm run hash-password`}
       KARET_WORKER_TOKEN: ${KARET_WORKER_TOKEN:?set KARET_WORKER_TOKEN (e.g. openssl rand -hex 32)}
       REDIS_URL: redis://valkey:6379
-      S3_CONSOLE_URL: ${S3_CONSOLE_URL:-http://localhost:9001}
     depends_on:
       rustfs:
         condition: service_started
@@ -128,16 +128,21 @@ reachable over the compose network.
 
 ## 2. Generate the secrets
 
-Karet refuses to start without four secrets. Three are random strings;
-the fourth is your admin password, hashed:
+Karet refuses to start without five secrets. Four are random strings; the
+fifth is your admin password, hashed:
 
 ```sh
 cat > .env <<EOF
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
 KARET_SESSION_SECRET=$(openssl rand -base64 48)
 KARET_WORKER_TOKEN=$(openssl rand -hex 32)
 KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)
 EOF
 ```
+
+`POSTGRES_PASSWORD` is what the bundled Postgres starts with and what the
+default `DATABASE_URL` uses to reach it, so changing it later means changing
+both.
 
 For the admin password hash, run `npm run hash-password` in a checkout
 of the [`karet`](https://github.com/karet-org/karet) repo. It prompts
@@ -201,7 +206,7 @@ your network is shared.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `S3_BUCKET_PIPELINES` | `karet-pipelines` | Bucket for configs, dashboards, and job records. |
+| `S3_BUCKET_PIPELINES` | `karet-pipelines` | Bucket for dashboards and saved queries. |
 | `S3_BUCKET_LAKE` | `karet-lake` | Bucket for raw source files. |
 | `S3_BUCKET_WAREHOUSE` | `karet-warehouse` | Bucket for partitioned Parquet output. |
 | `AWS_ENDPOINT_URL` | `http://rustfs:9000` | S3 endpoint URL. Set to `https://s3.<region>.amazonaws.com` to swap out RustFS for real AWS. |
@@ -209,14 +214,20 @@ your network is shared.
 | `AWS_SECRET_ACCESS_KEY` | `rustfsadmin` | S3 secret key. |
 | `AWS_REGION` | `us-east-1` | AWS region. |
 | `REDIS_URL` | `redis://valkey:6379` | Valkey/Redis connection string (web + worker). |
-| `KARET_SESSION_SECRET` | *(required)* | HMAC key for signing user session cookies. |
-| `KARET_ADMIN_PASSWORD_HASH` | *(required)* | scrypt hash of the admin password (`npm run hash-password`). |
+| `DATABASE_URL` | *(required)* | Postgres connection string (web + worker). Accounts, pipelines, config versions, job history, access. |
+| `POSTGRES_PASSWORD` | *(required)* | Password for the bundled Postgres, which the default `DATABASE_URL` interpolates. |
+| `POSTGRES_USER` / `POSTGRES_DB` | `karet` | Role and database name for that Postgres. |
+| `KARET_SESSION_SECRET` | *(required)* | Signs session cookies. `openssl rand -base64 48`. |
+| `KARET_ADMIN_PASSWORD_HASH` | *(required)* | scrypt hash of the bootstrap admin's password, re-asserted on every start (`npm run hash-password`). |
+| `KARET_ADMIN_USERNAME` | `admin` | Username of that bootstrap admin. |
 | `KARET_WORKER_TOKEN` | *(required)* | Bearer token the web service sends on worker `/config/validate` calls. |
 | `KARET_WEBHOOK_SECRET` | *(required)* | Shared secret RustFS sends with upload events; verified by the worker. |
+| `KARET_PUBLIC_URL` | `http://localhost:3000` | The URL people reach this instance on. An `https:` value turns on secure cookies, so set it when you put Karet behind a proxy. |
+| `S3_FORCE_PATH_STYLE` | unset | `true` for S3 implementations without virtual-host addressing, RustFS included. |
 | `WORKER_CONCURRENCY` | `1` | Jobs processed concurrently per worker. |
 | `DUCKDB_MEMORY_LIMIT` | `512MB` | Memory cap for the web service's DuckDB session. |
 | `DUCKDB_THREADS` | `2` | Thread cap for that session. |
-| `S3_CONSOLE_URL` | `http://localhost:9001` | If set, the UI shows a Settings &rarr; S3 console link pointing at this URL. Empty hides the link entirely (recommended for AWS deployments). |
+| `DATABASE_POOL_MAX` | `8` web, `4` worker | Postgres connections each service opens. |
 
 ## Upgrading
 
@@ -225,9 +236,10 @@ docker compose pull
 docker compose up -d
 ```
 
-The `rustfs-data` and `valkey-data` volumes persist across restarts and
-pulls, so your pipelines, dashboards, job history, and queued jobs all
-survive upgrades.
+The `postgres-data`, `rustfs-data` and `valkey-data` volumes persist across
+restarts and pulls, so your accounts, pipelines, dashboards, job history and
+queued jobs all survive upgrades. `postgres-data` is the one to back up: it holds
+everything that is not a file, and the schema migrates itself on start.
 
 ::: warning Upgrading from ≤ 0.1.x
 0.2.0 changed the architecture: jobs now travel over a Valkey queue, the
@@ -275,5 +287,5 @@ Redis-compatible endpoint such as ElastiCache for Valkey).
 
 - [Getting started](./getting-started), build a Spending Tracker pipeline
   end to end.
-- [Architecture](./architecture), the four services and how they connect.
+- [Architecture](./architecture), the services and how they connect.
 - [Authentication](./authentication), env-based credential and password rotation.

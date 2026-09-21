@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Karet
-  text: Self-hosted ETL and dashboards
-  tagline: Ingest CSV and JSON logs, build pipelines in a visual graph, and chart the results with DuckDB.
+  text: The self-hosted analytics stack
+  tagline: ETL pipelines you draw as a graph and dashboards you describe in YAML, on hardware you own, up in one Docker Compose file.
   actions:
     - theme: brand
       text: Get started
@@ -14,20 +14,25 @@ hero:
       link: https://github.com/karet-org/karet
 
 features:
-  - title: Five small services
-    details: A Next.js web UI, a Rust/Axum worker, an S3-compatible object store, a Valkey job queue and Postgres. Accounts, config versions and job history are rows; your data stays in the buckets.
-  - title: SQL-driven dashboards
-    details: Every panel is a DuckDB query in a YAML config, edited in-app with autocomplete and inline validation. Click a chart to filter the rest.
-  - title: CSV and JSON logs
-    details: Point a source at a bucket prefix. NDJSON reads log shippers' native output, with dotted paths, record filters and epoch timestamps.
-  - title: Enrich and filter at ingest
-    details: Dimensions join small reference tables onto rows, exact or by keyword; row filters drop what you don't want stored.
-  - title: Auto-runs on upload
-    details: Drop a file into the bucket and a webhook kicks off a debounced pipeline run.
-  - title: Accounts and roles
-    details: Named accounts with viewer, editor and admin. A password or role change signs that person out, nobody else.
-  - title: Versioned, atomically
-    details: Every run publishes by flipping a pointer, so a query never sees a half-written table. Query a table as of an earlier version, or roll it back.
-  - title: Attributed config changes
-    details: Every save records who made it and what changed, with a diff that ignores layout noise and a one-click restore.
+  - title: Pipeline visualization
+    details: >-
+      The graph is the editor. Sources, dimensions, mappings and tables are nodes;
+      drag between them to say what feeds what, and the layout is saved with the
+      pipeline so it looks the same to everyone.
+  - title: Config-driven dashboards
+    details: >-
+      A dashboard is a YAML document and every panel is a DuckDB query, edited
+      in-app with autocomplete and inline validation. Click a chart to filter the
+      rest.
+  - title: Pipeline versioning
+    details: >-
+      Every save is a numbered version with an author and a diff against what is
+      live, and a restore writes forward rather than rewinding. Runs are pinned to
+      the version that produced them, and a table can be read as of an earlier
+      version or rolled back to one.
+  - title: Docker Compose and go
+    details: >-
+      One compose file brings up the web app, the worker, Postgres, Valkey and an
+      S3-compatible store, from prebuilt images. Generate two secrets and an admin
+      password hash, create three buckets, and that is the install.
 ---

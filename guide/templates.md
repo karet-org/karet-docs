@@ -1,7 +1,8 @@
 # Templates
 
 When you click **+ New pipeline**, you choose a template. A template is a
-bundle of files that get copied under `pipelines/<slug>/` in S3.
+bundle of files that get copied under `pipelines/<slug>/` in S3, plus the config
+itself, which becomes the pipeline's first version in Postgres.
 
 ## Built-in templates
 
@@ -9,7 +10,8 @@ bundle of files that get copied under `pipelines/<slug>/` in S3.
 
 An empty config with no source containers, mappings, analytic tables,
 or dashboards. Useful when you want to assemble everything yourself in
-the graph editor.
+the graph editor. **This is the default**: accepting it gives you an empty
+pipeline rather than somebody else's example.
 
 ### Traffic Analytics
 

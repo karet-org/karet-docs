@@ -5,17 +5,23 @@ pipeline, and the **data** each run publishes.
 
 ## Config history
 
-Every save writes a numbered entry beside the live config:
+Every save inserts a numbered row in Postgres, and a pointer says which one is
+live:
 
 ```text
-pipelines/<slug>/pipeline.json          the live config, what the worker reads
-pipelines/<slug>/_history/<n>.json      { version, saved_at, author, note, config }
+config_versions      (pipeline, version, config, author, note, created_at)
+pipelines_current    (pipeline, config_version_id)
 ```
 
-The **History** page lists them newest first with the author and a summary of
-what changed. Layout is ignored when computing that summary: dragging a node
-around the graph is recorded, but it is not a change to the pipeline, and
-counting it would bury the real edits.
+Nothing is updated in place, so the trail cannot be rewritten, and a run carries
+the version id it should use rather than reading whatever the head says when it
+starts.
+
+The **History** page lists versions newest first with the author, and shows the
+diff between the version you are inspecting and the one that is live, the way you
+would read a `git diff`. Layout is ignored when deciding whether anything changed:
+dragging a node around the graph is recorded, but it is not a change to the
+pipeline, and counting it would bury the real edits.
 
 Restoring writes the chosen config forward as a new version rather than winding
 history back, so the trail stays append-only and a restore you regret is just
@@ -23,6 +29,13 @@ another restore. The restored config is re-validated first, since an old version
 can predate a schema change.
 
 The last 100 versions per pipeline are kept.
+
+### Two editors, one pipeline
+
+A save carries the version the editor loaded, in an `X-Karet-Config-Version`
+header. If the live version has moved on, the save is refused with `412` and the
+editor keeps your changes and tells you to reload, rather than overwriting
+whatever the other person did.
 
 ## Data versions
 
