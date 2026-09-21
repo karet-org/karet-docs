@@ -32,10 +32,27 @@ shipped at the root of the `karet` repo):
 name: karet
 
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-karet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (e.g. openssl rand -hex 24)}
+      POSTGRES_DB: ${POSTGRES_DB:-karet}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-karet} -d ${POSTGRES_DB:-karet}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   valkey:
     image: valkey/valkey:8-alpine
     restart: unless-stopped
-    command: ["valkey-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    # AOF with everysec fsync: at most ~1s of queue/debounce state lost on
+    # crash. Job history is durable in S3 regardless.
+    command: ["valkey-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxclients", "1024"]
     volumes:
       - valkey-data:/data
     healthcheck:
@@ -61,9 +78,12 @@ services:
       RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS: "*"
       RUSTFS_NOTIFY_ENABLE: "true"
       RUSTFS_NOTIFY_WEBHOOK_ENABLE_PRIMARY: "on"
+      # Upload events go to the worker, which owns debounce + enqueue.
+      # The secret rides in a header, not the URL.
       RUSTFS_NOTIFY_WEBHOOK_ENDPOINT_PRIMARY: "http://worker:8080/events/s3"
       RUSTFS_NOTIFY_WEBHOOK_AUTH_TOKEN_PRIMARY: ${KARET_WEBHOOK_SECRET:?set KARET_WEBHOOK_SECRET (e.g. openssl rand -hex 32)}
       RUSTFS_NOTIFY_WEBHOOK_QUEUE_DIR_PRIMARY: /tmp/rustfs-events
+      # RustFS only makes outbound requests to allow-listed origins.
       RUSTFS_OUTBOUND_ALLOW_ORIGINS: "http://worker:8080"
     volumes:
       - rustfs-data:/data
@@ -84,10 +104,13 @@ services:
       REDIS_URL: redis://valkey:6379
       KARET_WEBHOOK_SECRET: ${KARET_WEBHOOK_SECRET:?set KARET_WEBHOOK_SECRET (e.g. openssl rand -hex 32)}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      DATABASE_URL: ${DATABASE_URL:-postgres://karet:${POSTGRES_PASSWORD}@postgres:5432/karet}
     depends_on:
       rustfs:
         condition: service_started
       valkey:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
 
   web:
@@ -110,6 +133,8 @@ services:
       KARET_ADMIN_PASSWORD_HASH: ${KARET_ADMIN_PASSWORD_HASH:?generate with `npm run hash-password`}
       KARET_WORKER_TOKEN: ${KARET_WORKER_TOKEN:?set KARET_WORKER_TOKEN (e.g. openssl rand -hex 32)}
       REDIS_URL: redis://valkey:6379
+      DATABASE_URL: ${DATABASE_URL:-postgres://karet:${POSTGRES_PASSWORD}@postgres:5432/karet}
+      KARET_PUBLIC_URL: ${KARET_PUBLIC_URL:-http://localhost:3000}
     depends_on:
       rustfs:
         condition: service_started
@@ -117,10 +142,13 @@ services:
         condition: service_started
       valkey:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
 volumes:
   rustfs-data:
   valkey-data:
+  postgres-data:
 ```
 
 The worker and Valkey ports are not exposed to the host. They are only
@@ -239,7 +267,56 @@ docker compose up -d
 The `postgres-data`, `rustfs-data` and `valkey-data` volumes persist across
 restarts and pulls, so your accounts, pipelines, dashboards, job history and
 queued jobs all survive upgrades. `postgres-data` is the one to back up: it holds
-everything that is not a file, and the schema migrates itself on start.
+everything that is not a file. The web image runs `scripts/db-setup.mjs` before
+it serves, so the schema migrates itself; several containers starting together is
+safe, because the first takes an advisory lock and the rest find nothing to do.
+
+::: warning Upgrading from ≤ 0.9.x
+0.10.0 moves the control plane into Postgres: pipelines, config versions, job
+history and accounts are rows now, not objects in the pipelines bucket. Nothing
+is deleted from S3 by the upgrade, so it is reversible by putting the old images
+back.
+
+1. **Back up the buckets.** They are the only copy of your pipelines until the
+   import has run:
+   ```sh
+   docker run --rm -v karet_rustfs-data:/src:ro -v "$PWD":/dst alpine:3 \
+     tar -C /src -czf /dst/karet-buckets.tar.gz karet-pipelines karet-lake karet-warehouse
+   ```
+2. **Add Postgres and the new variables.** Take the `postgres` service from the
+   compose file above, add `POSTGRES_PASSWORD` to `.env`, and give both `web` and
+   `worker` the same `DATABASE_URL`. If you set `BETTER_AUTH_SECRET` or
+   `BETTER_AUTH_URL` by hand, they are `KARET_SESSION_SECRET` and
+   `KARET_PUBLIC_URL`; `S3_CONSOLE_URL` is gone.
+3. **Start the database and apply the schema.**
+   ```sh
+   docker compose pull
+   docker compose up -d postgres
+   docker compose run --rm --no-deps web node scripts/db-setup.mjs
+   ```
+   That also creates the bootstrap admin from `KARET_ADMIN_PASSWORD_HASH`, so
+   your existing password still works. Other people are accounts you create in
+   Settings afterwards.
+4. **Import what is in S3.** Report first, then do it:
+   ```sh
+   docker compose run --rm --no-deps -e DRY_RUN=1 web node scripts/import-s3-to-postgres.mjs
+   docker compose run --rm --no-deps web node scripts/import-s3-to-postgres.mjs
+   ```
+   Each `pipeline.json` becomes config version 1 with its `_history/*.json`
+   folded in ahead of it, and each `jobs/*.json` becomes a job row. Dashboards,
+   saved queries, lake files and Parquet stay where they are.
+5. **Adopt tables written before manifests**, or they read as empty:
+   ```sh
+   docker compose run --rm --no-deps web node scripts/adopt-warehouse-manifests.mjs
+   ```
+6. **Bring the rest up:** `docker compose up -d`.
+7. **Leave `pipelines/<slug>/pipeline.json` in place.** The worker builds its
+   upload-routing table by listing those objects, so deleting them stops
+   upload-triggered runs. Manual runs are unaffected.
+
+Both scripts are idempotent and only insert what is missing, so a partial run can
+be repeated.
+:::
 
 ::: warning Upgrading from ≤ 0.1.x
 0.2.0 changed the architecture: jobs now travel over a Valkey queue, the
