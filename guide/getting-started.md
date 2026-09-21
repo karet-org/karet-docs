@@ -19,12 +19,17 @@ uses prebuilt images from GHCR and skips the source checkout.
 git clone https://github.com/karet-org/karet
 cd karet
 
-# Generate a secret used to sign session cookies.
-echo "KARET_SESSION_SECRET=$(openssl rand -base64 48)" > .env
+cat > .env <<EOF
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
+KARET_SESSION_SECRET=$(openssl rand -base64 48)
+KARET_WORKER_TOKEN=$(openssl rand -hex 32)
+KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)
+EOF
 ```
 
-The compose file refuses to start without `KARET_SESSION_SECRET`: a
-default value would let anyone forge a session.
+Compose refuses to start without these, and without your admin password hash:
+run `npm run hash-password` and append the `KARET_ADMIN_PASSWORD_HASH=...` line
+it prints to `.env`. Defaults for any of them would let anyone in.
 
 ## 2. Start the stack
 
@@ -32,12 +37,13 @@ default value would let anyone forge a session.
 docker compose up -d
 ```
 
-Four services come up:
+Five services come up:
 
 | Service | Port | Purpose |
 |---------|------|---------|
 | `web` | `:3000` | Karet's Next.js UI |
-| `worker` | `:8080` | The Rust/Axum pipeline worker |
+| `worker` | `:8080` | The Rust pipeline worker |
+| `postgres` | internal | Accounts, pipelines, config versions, job history |
 | `rustfs` | `:9000` (`:9001` console) | S3-compatible object store |
 | `valkey` | internal | Job queue and live job state |
 
@@ -62,17 +68,22 @@ the RustFS console at <http://localhost:9001>.
 
 ## 4. Sign in
 
-Open <http://localhost:3000> and sign in with the admin password you
-provisioned during [self-hosting setup](./self-hosting#_2-generate-the-secrets).
+Open <http://localhost:3000> and sign in as the admin whose password you hashed
+in step 1. Set your display name or change that password on
+[Settings](./authentication#your-own-account).
+
+Pipelines you create are visible only to you and other instance admins until you
+grant someone access on the pipeline's **Access** page. See
+[per-pipeline access](./authentication#per-pipeline-access).
 
 ## 5. Create your first pipeline
 
-From the home page, click **+ New pipeline** and pick the **Spending Tracker**
-template. This provisions:
+From the home page, click **+ New pipeline**. **Blank** is selected by default;
+for this walkthrough pick **Spending Tracker** instead. That provisions:
 
 - A source container at `pipelines/<slug>/transactions/` that expects
   `date, description, amount, account` CSVs.
-- A keyword-lookup mapping that tags each row with a category.
+- A dimension that tags each row with a category by keyword match.
 - An analytic table written to `pipelines/<slug>/transactions/` as
   partitioned Parquet.
 - A dashboard with KPI tiles, a category doughnut, a monthly-trend line,
@@ -91,6 +102,10 @@ If you've enabled the [auto-run webhook](./webhooks), the upload triggers
 a pipeline run automatically (with a 5-second debounce so a batch upload
 becomes one job). Otherwise click **Run Pipeline** on the **Jobs** page.
 
+Until that first run finishes, the **Data** page says the table has no data yet.
+A table only exists in the warehouse once a run has published it, so there is
+nothing to query before then.
+
 ## 7. View the dashboard
 
 Navigate to **Dashboards → Spending Overview**. KPIs, charts, and the
@@ -98,7 +113,7 @@ transactions table all populate from the Parquet output.
 
 ## What's next?
 
-- [Architecture](./architecture): the four services and how they connect.
+- [Architecture](./architecture): the services and how they connect.
 - [Pipeline config](/reference/pipeline-config): the JSON shape that drives ingest.
 - [Dashboard config](/reference/dashboard-config): panel kinds, layout, cross-filters.
 - [Auto-runs](./webhooks): wire RustFS uploads to pipeline runs.

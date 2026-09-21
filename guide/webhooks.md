@@ -1,6 +1,6 @@
 # Auto-runs (webhooks)
 
-Uploading a CSV to a pipeline's raw prefix automatically triggers a
+Uploading a source file to a pipeline's raw prefix automatically triggers a
 pipeline run. A debouncer coalesces a batch upload (say, 12 monthly
 CSVs) into a single job.
 
@@ -15,7 +15,7 @@ sequenceDiagram
   participant W as karet-worker
   participant V as Valkey
 
-  Note over R: CSVs uploaded to a pipeline's raw prefix
+  Note over R: files uploaded to a pipeline's raw prefix
   R->>W: POST /events/s3 (auth token)
   W->>V: extend debounce window for slug
   R->>W: POST /events/s3 (more uploads)
@@ -92,7 +92,7 @@ you deviate.
 
 ### 3. Test it
 
-Upload a CSV to any pipeline's raw prefix in the lake bucket:
+Upload a source file to any pipeline's raw prefix in the lake bucket:
 
 ```sh
 aws --endpoint-url=http://localhost:9000 \

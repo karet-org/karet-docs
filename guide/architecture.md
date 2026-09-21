@@ -1,40 +1,58 @@
 # Architecture
 
-Karet is four services orchestrated by Docker Compose: three S3 buckets
-hold all durable data, and a Valkey instance coordinates the job queue.
+Karet is a web app, a worker, and the three stores they share, orchestrated by
+Docker Compose. Postgres holds the control plane, three S3 buckets hold the data,
+and Valkey coordinates the job queue.
 
 | Service | Stack | Role |
 |---------|-------|------|
 | **rustfs** | [RustFS](https://rustfs.com) | S3-compatible object store. Hosts the three Karet buckets and posts upload events to the worker, which routes each event to every pipeline whose source prefix matches the uploaded key. |
 | **valkey** | [Valkey](https://valkey.io) | Job queue (Redis stream), live job state, and webhook debounce. Coordination only. Losing it never loses history. |
-| **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests source CSVs, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
+| **postgres** | Postgres 17 | The control plane: accounts and sessions, the pipeline registry, config versions and job history. The web owns its schema; the worker reads configs and writes job rows. |
+| **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests CSV and NDJSON sources, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |
 
+One diagram for who calls whom, and a table for who writes what. Trying to draw
+both at once produced thirteen crossing arrows and told you less.
+
 ```mermaid
-%%{ init: { "flowchart": { "nodeSpacing": 55, "rankSpacing": 70 } } }%%
-flowchart TB
-  web["karet (Next.js) :3000"]
-  valkey[("valkey (queue + live state)")]
-  worker["karet-worker (Rust / Axum / Polars)"]
+%%{ init: { "flowchart": { "nodeSpacing": 60, "rankSpacing": 70 } } }%%
+flowchart LR
+  web["karet<br/>Next.js :3000"]
+  worker["karet-worker<br/>Rust / Axum / Polars :8080"]
+  valkey[("valkey")]
+  rustfs[("rustfs<br/>S3 API :9000")]
+  postgres[("postgres")]
 
-  subgraph s3["rustfs (S3 API) :9000"]
-    pipelines[("karet-pipelines")]
-    lake[("karet-lake")]
-    warehouse[("karet-warehouse")]
-  end
+  web -->|"validate a config"| worker
+  web -->|"enqueue a run"| valkey
+  valkey -->|"claim"| worker
+  worker -->|"progress, locks"| valkey
+  rustfs -->|"object-put event"| worker
 
-  web -->|"enqueue job (XADD)"| valkey
-  web -->|"read live status + progress"| valkey
-  web -->|"read config / dashboards / job history"| pipelines
-  web -->|"query Parquet (DuckDB)"| warehouse
-
-  valkey -->|"claim job (consumer group)"| worker
-  worker -->|"read config / write job records"| pipelines
-  worker -->|"read raw data"| lake
-  worker -->|"write Parquet"| warehouse
-
-  lake -->|"object-put webhook"| worker
+  web <--> postgres
+  worker <--> postgres
+  web <--> rustfs
+  worker <--> rustfs
 ```
+
+The web is the only service a browser reaches. The worker is reachable only on the
+compose network, and the two speak just once: a config is validated by the worker
+before the web publishes it. Everything else between them goes through a store.
+
+## Who writes what
+
+| Store | Holds | Written by | Read by |
+|-------|-------|-----------|---------|
+| **postgres** | accounts, sessions, pipeline registry, config versions, job rows | web (everything but job rows, and it owns migrations), worker (job rows) | both |
+| **valkey** | job stream, live job state, per-pipeline run locks, upload debounce | web (enqueue), worker (claim, progress, locks, its own debounced enqueues) | both |
+| **karet-lake** | raw CSV and NDJSON you upload | web (the Data lake browser uploads, moves, deletes) | worker |
+| **karet-warehouse** | partitioned Parquet, per-table manifests, the `_current.json` pointer | worker (a run publishes), web (a restore publishes) | both |
+| **karet-pipelines** | dashboard YAML, saved queries, thumbnails, workspace settings | web | web |
+
+Two rows are worth reading twice. Postgres is the only store where each table has
+exactly one writer. The warehouse has two publishers, and only the worker takes the
+per-pipeline lock, so a restore during a run is a race on the same version counter.
 
 ## The job queue
 
@@ -46,12 +64,12 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
 2. **Claim.** A worker claims the message via a consumer group, takes a
    per-pipeline lock (`SET NX` with heartbeat renewal) so at most one
    run per pipeline executes cluster-wide, and marks the job `running`.
-3. **Execute.** The config is validated, CSVs ingested, and progress
+3. **Execute.** The config is validated, source files ingested, and progress
    (stage, file/mapping counters) streamed into the live hash. The Jobs
    page polls it.
-4. **Finish.** The worker writes the terminal record to S3
-   (`pipelines/<slug>/jobs/<id>.json`), updates the live hash (24 h
-   TTL), releases the lock, and acks the message.
+4. **Finish.** The worker updates the job's row in Postgres with its outcome,
+   updates the live hash (24 h TTL), releases the lock, and acks the
+   message.
 
 Failures retry with exponential backoff (up to `MAX_ATTEMPTS`, default
 3). If a worker crashes mid-run, its unacked message idles in the
@@ -73,7 +91,7 @@ policies per bucket.
 | Bucket | Env var | Holds |
 |--------|---------|-------|
 | `karet-pipelines` | `S3_BUCKET_PIPELINES` | Pipeline configs, dashboards, saved queries, job records. |
-| `karet-lake` | `S3_BUCKET_LAKE` | Raw CSV files you upload. |
+| `karet-lake` | `S3_BUCKET_LAKE` | Raw source files you upload: CSV, or JSON lines. |
 | `karet-warehouse` | `S3_BUCKET_WAREHOUSE` | Query-ready partitioned Parquet. |
 
 ## Design notes
@@ -94,16 +112,19 @@ Each bucket keys objects under `pipelines/<slug>/`, so a pipeline's data
 lines up across the three buckets:
 
 ```
-karet-pipelines  pipelines/<slug>/pipeline.json          # sources + mappings + tables
-                 pipelines/<slug>/dashboards/*.yaml       # one per dashboard
+karet-pipelines  pipelines/<slug>/dashboards/*.yaml       # one per dashboard
                  pipelines/<slug>/queries/*.json          # one per saved query
-                 pipelines/<slug>/jobs/job-<ts>-<rand>.json  # terminal job records
                  pipelines/<slug>/preview.png             # home-page thumbnail
 
 karet-lake       pipelines/<slug>/transactions/*.csv     # raw inputs you upload
 
-karet-warehouse  pipelines/<slug>/<table>/year=YYYY/month=MM/<mapping>.parquet
+karet-warehouse  pipelines/<slug>/<table>/_current.json   # which version is live
+                 pipelines/<slug>/<table>/_manifests/<n>.json
+                 pipelines/<slug>/<table>/v<n>/year=YYYY/month=MM/<mapping>.parquet
 ```
+
+The config itself, the pipeline registry and job history are rows in Postgres, not
+objects here. See [where data lives](./data-stores).
 
 ## Trust boundaries
 

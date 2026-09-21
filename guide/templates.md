@@ -1,7 +1,8 @@
 # Templates
 
 When you click **+ New pipeline**, you choose a template. A template is a
-bundle of files that get copied under `pipelines/<slug>/` in S3.
+bundle of files that get copied under `pipelines/<slug>/` in S3, plus the config
+itself, which becomes the pipeline's first version in Postgres.
 
 ## Built-in templates
 
@@ -9,7 +10,31 @@ bundle of files that get copied under `pipelines/<slug>/` in S3.
 
 An empty config with no source containers, mappings, analytic tables,
 or dashboards. Useful when you want to assemble everything yourself in
-the graph editor.
+the graph editor. **This is the default**: accepting it gives you an empty
+pipeline rather than somebody else's example.
+
+### Traffic Analytics
+
+A worked example of the log-ingest path, using two request logs that
+arrive in different formats and land in one table:
+
+- **Source container** `caddy_access_raw` reads `format: "ndjson"` files,
+  selects access-log entries with a `record_filter`, and pulls nested
+  fields out with dotted paths (`request.headers.User-Agent[0]`).
+- **Source container** `edge_access_raw` reads the same kind of traffic
+  as CSV, to show two shapes unioning into one table.
+- **Dimensions**, one of each shape: `services` maps a hostname to two
+  value columns (`service` and `team`) with `on_miss: "passthrough"`,
+  `crawlers` flags bots by user-agent substring, and `countries` is
+  file-backed, reading a CSV from the lake and exposing `country_name`
+  and `region` with `on_miss: { literal: "Unknown" }`.
+- **Mapping** `caddy_mapping` turns the epoch timestamp into a date with
+  `from_unix`, enriches rows via `dim_ref`, and uses `where` to drop bot
+  traffic before it is stored. `edge_mapping` writes the same table from
+  the CSV source.
+- **Analytic table** `requests` is partitioned and deduped.
+- **Dashboard** `Traffic Overview` has three KPI tiles, a requests-per-day
+  line, two bars and a table.
 
 ### Spending Tracker
 
@@ -18,17 +43,17 @@ A worked example covering the full feature set:
 - **Source container** `transactions_raw` reads CSVs from
   `pipelines/<slug>/transactions/` with columns `date, description,
   amount, account`.
-- **Lookup mappings**:
+- **Dimensions**:
   - `categories` tags each row by keyword-substring match against the
     description (e.g. `STARBUCKS → FOOD`, `UBER → TRANSPORT`,
-    `PAYROLL → INCOME`), with a `catch_all` of `OTHER`.
+    `PAYROLL → INCOME`), with `on_miss: { literal: "OTHER" }`.
   - `merchants` maps merchant variants to canonical names
     (e.g. `STARBUCKS → Starbucks`).
 - **Mapping** `transactions_mapping` parses the date, normalizes the
   description, casts `amount` to `float64`, populates `category` via
-  `lookup_ref`, and populates `merchant` via
-  `coalesce(lookup_ref(merchants, ...), cleaned_description)`. Rows
-  the merchants lookup misses keep their cleaned description.
+  `dim_ref`, and populates `merchant` via
+  `coalesce(dim_ref(merchants, ...), cleaned_description)`. Rows the
+  merchants dimension misses keep their cleaned description.
 - **Analytic table** `transactions` writes month-partitioned Parquet to
   `pipelines/<slug>/transactions/year=YYYY/month=MM/data.parquet`.
 - **Dashboard** `Spending Overview` ships with three KPI tiles
@@ -44,7 +69,8 @@ A worked example covering the full feature set:
 
 ## Adding your own template
 
-Templates live in `src/karet/lib/templates/index.ts`. To add one:
+Templates live in `src/karet/lib/templates/`, registered in `index.ts`
+(larger ones, like Traffic Analytics, get their own module). To add one:
 
 1. Define a `PipelineConfig` value with your source containers, mappings,
    and analytic tables.
