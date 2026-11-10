@@ -7,9 +7,9 @@ from GitHub Container Registry and start them with Docker Compose.
 
 - Docker with the Compose plugin (`docker compose`), or any other
   Compose-speaking runtime (Finch, Podman with `podman-compose`).
-- A working directory; the compose file creates Docker volumes for the
-  S3 emulator's data and the Valkey queue.
-- About 1 GB of free disk for those volumes plus the four images.
+- A working directory; the compose file creates Docker volumes for
+  Postgres, the S3 emulator's data and the Valkey queue.
+- About 3 GB of free disk for the five images, plus your data.
 
 The published images are:
 
@@ -17,11 +17,13 @@ The published images are:
 |-------|--------|
 | `ghcr.io/karet-org/karet:latest` | [`karet-org/karet`](https://github.com/karet-org/karet), Next.js UI |
 | `ghcr.io/karet-org/karet-worker:latest` | [`karet-org/karet-worker`](https://github.com/karet-org/karet-worker), Rust/Axum pipeline worker |
+| `postgres:17-alpine` | Upstream [Postgres](https://www.postgresql.org), accounts, configs and job history |
 | `rustfs/rustfs:latest` | Upstream [RustFS](https://github.com/rustfs/rustfs) S3-compatible object store |
 | `valkey/valkey:8-alpine` | Upstream [Valkey](https://valkey.io), job queue and live state |
 
-`:latest` tracks the default branch of each repo. Pin to a versioned
-tag (e.g. `0.2.0`) for reproducible deploys.
+`:latest` tracks the default branch of each repo. Pin versioned tags for
+reproducible deploys. The web app and the worker are versioned separately;
+for example, web 0.10.1 runs with worker 0.7.0.
 
 ## 1. Drop in the compose file
 
@@ -185,7 +187,7 @@ for a password (≥ 8 characters) and prints a ready-to-paste
 docker compose up -d
 ```
 
-First boot pulls ~300 MB of images.
+First boot downloads about 720 MB of images.
 
 ## 4. Create the buckets
 
@@ -248,14 +250,14 @@ your network is shared.
 | `KARET_SESSION_SECRET` | *(required)* | Signs session cookies. `openssl rand -base64 48`. |
 | `KARET_ADMIN_PASSWORD_HASH` | *(required)* | scrypt hash of the bootstrap admin's password, re-asserted on every start (`npm run hash-password`). |
 | `KARET_ADMIN_USERNAME` | `admin` | Username of that bootstrap admin. |
-| `KARET_WORKER_TOKEN` | *(required)* | Bearer token the web service sends on worker `/config/validate` calls. |
+| `KARET_WORKER_TOKEN` | *(required)* | Bearer token the web service sends on worker `/config/validate` calls, and that [machine callers](./authentication#automation-and-ci) send to the web API. |
 | `KARET_WEBHOOK_SECRET` | *(required)* | Shared secret RustFS sends with upload events; verified by the worker. |
 | `KARET_PUBLIC_URL` | `http://localhost:3000` | The URL people reach this instance on. An `https:` value turns on secure cookies, so set it when you put Karet behind a proxy. |
 | `S3_FORCE_PATH_STYLE` | unset | `true` for S3 implementations without virtual-host addressing, RustFS included. |
 | `WORKER_CONCURRENCY` | `1` | Jobs processed concurrently per worker. |
 | `DUCKDB_MEMORY_LIMIT` | `512MB` | Memory cap for the web service's DuckDB session. |
 | `DUCKDB_THREADS` | `2` | Thread cap for that session. |
-| `DATABASE_POOL_MAX` | `8` web, `4` worker | Postgres connections each service opens. |
+| `DATABASE_POOL_MAX` | web: `8` app + `4` auth; worker: `4` | Postgres connections per pool. On the web service it caps both of its pools. |
 
 ## Upgrading
 

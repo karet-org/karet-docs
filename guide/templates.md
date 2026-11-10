@@ -1,8 +1,9 @@
 # Templates
 
 When you click **+ New pipeline**, you choose a template. A template is a
-bundle of files that get copied under `pipelines/<slug>/` in S3, plus the config
-itself, which becomes the pipeline's first version in Postgres.
+config, which becomes the pipeline's first version in Postgres, plus files
+copied under `pipelines/<slug>/` in S3: dashboards, and sample data in the
+lake.
 
 ## Built-in templates
 
@@ -10,8 +11,8 @@ itself, which becomes the pipeline's first version in Postgres.
 
 An empty config with no source containers, mappings, analytic tables,
 or dashboards. Useful when you want to assemble everything yourself in
-the graph editor. **This is the default**: accepting it gives you an empty
-pipeline rather than somebody else's example.
+the graph editor. **This is the default**, so accepting the dialog without
+choosing gives you an empty pipeline.
 
 ### Traffic Analytics
 
@@ -32,7 +33,10 @@ arrive in different formats and land in one table:
   `from_unix`, enriches rows via `dim_ref`, and uses `where` to drop bot
   traffic before it is stored. `edge_mapping` writes the same table from
   the CSV source.
-- **Analytic table** `requests` is partitioned and deduped.
+- **Analytic table** `requests` is partitioned by `month` and deduped on
+  `date, client_ip, path, status, duration_ms`.
+- **Sample data**: a few requests in each format, plus the countries CSV
+  the file-backed dimension reads, so the first run has something to load.
 - **Dashboard** `Traffic Overview` has three KPI tiles, a requests-per-day
   line, two bars and a table.
 
@@ -54,22 +58,29 @@ A worked example covering the full feature set:
   `dim_ref`, and populates `merchant` via
   `coalesce(dim_ref(merchants, ...), cleaned_description)`. Rows the
   merchants dimension misses keep their cleaned description.
-- **Analytic table** `transactions` writes month-partitioned Parquet to
-  `pipelines/<slug>/transactions/year=YYYY/month=MM/data.parquet`.
+- **Analytic table** `transactions` is partitioned by `year` and `month`,
+  for example
+  `pipelines/<slug>/transactions/v3/year=2026/month=4/transactions_mapping.parquet`
+  in the warehouse bucket.
+- **Sample data**: two months of transactions in
+  `pipelines/<slug>/transactions/seed.csv`.
 - **Dashboard** `Spending Overview` ships with three KPI tiles
   (Total Spending in CAD, Transactions count, Top Category), a category
   doughnut, a vertical Monthly Spending bar (`x_bin: "month"`), a
   horizontal Top 10 Merchants bar grouped by `merchant`, and a paginated
-  transactions table. The dashboards' SQL excludes
-  `TRANSFER`, `INVESTMENT`, and `INCOME` rows.
-- **Dashboard** `Cash Flow` shows a Sankey of `description → account →
-  category` (income sources flow into accounts, accounts flow out to
-  spending categories) plus an Income & Transfers table. Clicking a
-  node cross-filters every panel by that node's column.
+  transactions table. Its SQL excludes `TRANSFER`, `INVESTMENT`, and
+  `INCOME` rows.
+- **Dashboard** `Cash Flow` shows a Sankey of `merchant → account →
+  category`: income flows from its source into accounts, and accounts
+  flow out to spending categories. A transactions table sits below it.
+- **Dashboard** `Net Income` has Net Savings, Total Income and Total
+  Expenses tiles, net-by-month and cumulative lines, income by month and
+  top income sources bars, and a monthly table. Its SQL excludes
+  `TRANSFER` and `INVESTMENT` rows.
 
 ## Adding your own template
 
-Templates live in `src/karet/lib/templates/`, registered in `index.ts`
+Templates live in `lib/templates/` in the `karet` repo, registered in `index.ts`
 (larger ones, like Traffic Analytics, get their own module). To add one:
 
 1. Define a `PipelineConfig` value with your source containers, mappings,
@@ -79,7 +90,7 @@ Templates live in `src/karet/lib/templates/`, registered in `index.ts`
 
 ```ts
 // lib/templates/index.ts
-export type TemplateId = "blank" | "spending" | "your_id";
+export type TemplateId = "blank" | "spending" | "traffic" | "your_id";
 
 export const TEMPLATES: Record<TemplateId, Template> = {
   // …

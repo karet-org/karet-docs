@@ -20,15 +20,15 @@ starts.
 The **History** page lists versions newest first with the author, and shows the
 diff between the version you are inspecting and the one that is live, the way you
 would read a `git diff`. Layout is ignored when deciding whether anything changed:
-dragging a node around the graph is recorded, but it is not a change to the
-pipeline, and counting it would bury the real edits.
+moving a node on the graph is saved, but the diff leaves it out so it does not
+hide real edits.
 
 Restoring writes the chosen config forward as a new version rather than winding
 history back, so the trail stays append-only and a restore you regret is just
 another restore. The restored config is re-validated first, since an old version
 can predate a schema change.
 
-The last 100 versions per pipeline are kept.
+Every version is kept until the pipeline is deleted.
 
 ### Two editors, one pipeline
 

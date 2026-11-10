@@ -12,8 +12,8 @@ and Valkey coordinates the job queue.
 | **karet-worker** | Rust / Axum / Polars | Consumes jobs from the queue, ingests CSV and NDJSON sources, applies AST-JSON mapping expressions via Polars, writes partitioned Parquet, and owns the job lifecycle end to end. |
 | **karet** | Next.js / React Flow / Chart.js | Renders the UI (pipeline list, graph editor, jobs, data, dashboards), queries the warehouse with DuckDB, enqueues manual runs, and owns auth. |
 
-One diagram for who calls whom, and a table for who writes what. Trying to draw
-both at once produced thirteen crossing arrows and told you less.
+The diagram shows which service calls which. The table after it shows which
+service writes to each store.
 
 ```mermaid
 %%{ init: { "flowchart": { "nodeSpacing": 60, "rankSpacing": 70 } } }%%
@@ -50,9 +50,9 @@ before the web publishes it. Everything else between them goes through a store.
 | **karet-warehouse** | partitioned Parquet, per-table manifests, the `_current.json` pointer | worker (a run publishes), web (a restore publishes) | both |
 | **karet-pipelines** | dashboard YAML, saved queries, thumbnails, workspace settings | web | web |
 
-Two rows are worth reading twice. Postgres is the only store where each table has
-exactly one writer. The warehouse has two publishers, and only the worker takes the
-per-pipeline lock, so a restore during a run is a race on the same version counter.
+In Postgres each table has exactly one writer. The warehouse has two publishers,
+and only the worker takes the per-pipeline lock, so a table restore that happens
+during a run can pick the same version number as the run.
 
 ## The job queue
 
@@ -65,8 +65,9 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
    per-pipeline lock (`SET NX` with heartbeat renewal) so at most one
    run per pipeline executes cluster-wide, and marks the job `running`.
 3. **Execute.** The config is validated, source files ingested, and progress
-   (stage, file/mapping counters) streamed into the live hash. The Jobs
-   page polls it.
+   (stage, file/mapping counters) written to the live hash. Each write is
+   announced on `karet:jobs:events:<pipeline>`, which the Jobs page follows
+   through a server-sent event stream.
 4. **Finish.** The worker updates the job's row in Postgres with its outcome,
    updates the live hash (24 h TTL), releases the lock, and acks the
    message.
@@ -74,14 +75,15 @@ Jobs travel over a Redis stream (`karet:jobs:stream`), never over HTTP:
 Failures retry with exponential backoff (up to `MAX_ATTEMPTS`, default
 3). If a worker crashes mid-run, its unacked message idles in the
 pending-entries list until another worker reclaims and re-runs it.
-Runs are idempotent (the same partition keys are rewritten), so
+A run that dies before publishing leaves the table on its previous
+version, and running the same job twice produces the same table, so
 at-least-once delivery is safe.
 
 **Division of state:** Valkey holds coordination data (queue, live
-status, debounce timers) that is small, hot, and expendable; S3 holds
-history that is durable and unbounded. A Valkey crash loses at most ~1
-second of coordination writes (AOF `everysec`): a queued-but-unstarted
-job, never a job record.
+status, debounce timers) that is small and can be lost; Postgres holds
+job history. A Valkey crash loses at most about 1 second of coordination
+writes (AOF `everysec`): a job that was queued but not started, never a
+job record.
 
 ## The three buckets
 
@@ -90,15 +92,15 @@ policies per bucket.
 
 | Bucket | Env var | Holds |
 |--------|---------|-------|
-| `karet-pipelines` | `S3_BUCKET_PIPELINES` | Pipeline configs, dashboards, saved queries, job records. |
+| `karet-pipelines` | `S3_BUCKET_PIPELINES` | Dashboards, saved queries, thumbnails, workspace settings, and the `pipeline.json` files of pipelines created before 0.10. |
 | `karet-lake` | `S3_BUCKET_LAKE` | Raw source files you upload: CSV, or JSON lines. |
 | `karet-warehouse` | `S3_BUCKET_WAREHOUSE` | Query-ready partitioned Parquet. |
 
 ## Design notes
 
-- **All durable state lives in S3.** No database to back up. Valkey is
-  rebuildable coordination state (its volume is worth persisting, but
-  losing it costs queued jobs, not data).
+- **Durable state is in Postgres and S3.** Back up both; see
+  [backups](./data-stores#backups). Valkey holds only coordination state:
+  keep its volume, but losing it costs queued jobs, not data.
 - **The worker owns the job lifecycle**, including the webhook receiver
   for RustFS upload events and every job-record write. The web service
   only enqueues and reads.

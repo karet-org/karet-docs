@@ -1,7 +1,9 @@
 # Pipeline config
 
 A pipeline's behavior (what it ingests, how rows are transformed, what
-it writes out) is fully described by `pipelines/<slug>/pipeline.json`.
+it writes out) is fully described by one JSON document, its config. Each
+save stores a new version in Postgres (see [config history](/guide/versions#config-history));
+an exported pipeline carries it as `pipeline.json`.
 
 ```ts
 interface PipelineConfig {
@@ -44,9 +46,9 @@ interface ColumnSchema {
 
 `path_prefix` is an absolute key prefix in the lake bucket, so a source
 can read any folder in the data lake, including folders shared with other
-pipelines. An upload triggers a run of every pipeline with a matching
-source prefix. Within one pipeline, no source's prefix may be nested
-under another's.
+pipelines. With [auto-runs](/guide/webhooks) set up, an upload triggers a
+run of every pipeline with a matching source prefix. Within one pipeline,
+no source's prefix may be nested under another's.
 
 ### CSV sources
 

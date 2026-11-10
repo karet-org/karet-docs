@@ -33,6 +33,6 @@ features:
   - title: Docker Compose and go
     details: >-
       One compose file brings up the web app, the worker, Postgres, Valkey and an
-      S3-compatible store, from prebuilt images. Generate two secrets and an admin
+      S3-compatible store, from prebuilt images. Generate four secrets and an admin
       password hash, create three buckets, and that is the install.
 ---
