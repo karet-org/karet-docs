@@ -120,6 +120,7 @@ karet-lake       pipelines/<slug>/transactions/*.csv     # raw inputs you upload
 
 karet-warehouse  pipelines/<slug>/<table>/_current.json   # which version is live
                  pipelines/<slug>/<table>/_manifests/<n>.json
+                 pipelines/<slug>/<table>/_sources/<n>.json  # files version n read
                  pipelines/<slug>/<table>/v<n>/year=YYYY/month=MM/<mapping>.parquet
 ```
 

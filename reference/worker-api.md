@@ -57,9 +57,11 @@ trigger, enqueued_at }`. For each claimed job the worker:
 1. Takes the per-pipeline run lock (at most one run per pipeline,
    cluster-wide; lock-busy jobs defer and retry).
 2. Validates the config; an invalid config fails the job without retry.
-3. With `clean_run: true`, deletes existing table output first so
-   removed source files don't leave stale partitions. The default is
-   incremental: re-runs overwrite partitions in place (idempotent).
+3. Lists each source prefix and decides per mapping whether to run in
+   full or [incrementally](./pipeline-config#incremental-runs), then
+   downloads only the files that needs. `clean_run: true` runs every
+   mapping in full and starts the new table version from an empty file
+   list, so removed source files don't leave stale partitions.
 4. Streams progress into `karet:jobs:live:<id>` (stage, file and
    mapping counters, partitions written).
 5. Publishes the table version, updates the job's row in Postgres with its

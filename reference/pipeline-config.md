@@ -279,9 +279,37 @@ listed as `partition_keys: ["year", "month"]`.
 evaluates (and assertions pass), rows sharing a key tuple collapse to
 one; the first in ingest order survives, and the dropped count is
 reported on the job record as `rows_deduped`. Overlapping re-exports
-collapse naturally because every run re-reads the whole source prefix.
+collapse, whether the run is a full one or an incremental one (below).
 Two different mappings writing one table are not deduplicated against
 each other.
+
+## Incremental runs
+
+A run reads only the source files a mapping has not read before, as long as
+nothing else that decides the mapping's output has changed. It ingests the new
+files, drops any new row whose dedup key is already in the table, and rewrites
+only the partitions the remaining rows fall into. The result is the same table
+a full run would produce.
+
+![An incremental run on the Jobs page: one file processed, one partition written](/images/jobs-incremental.png)
+
+A mapping runs in full, re-reading its whole source prefix, when:
+
+- the mapping, its source container, its analytic table, a dimension, or a
+  file-backed dimension's CSV has changed;
+- a file it already read was deleted or replaced;
+- the table has `dedup_keys` and a new file's key sorts before a file already
+  read. Dedup keeps the first row in ingest order, which is key order, so
+  appending matches a full run only when new files sort last. Name uploads so
+  they sort by time, such as `2026-06.csv` or `access_<epoch>.csv`;
+- it is the first run since the table was created, restored to an earlier
+  version, or written by a worker older than 0.7.0;
+- the job asked for a clean run.
+
+What each mapping has read is stored next to the table's manifest; see
+[data versions](/guide/versions#data-versions). A run with no new files writes
+nothing. On the job record, `files_processed` counts only the files the run
+read, and `rows_deduped` counts only the duplicates it found among them.
 
 ## Worked example
 

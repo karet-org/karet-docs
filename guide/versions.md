@@ -45,8 +45,13 @@ version prefix, and the run publishes by replacing one small pointer object:
 ```text
 pipelines/<slug>/<table>/_current.json          {"version": 7}
 pipelines/<slug>/<table>/_manifests/7.json      the file list for version 7
+pipelines/<slug>/<table>/_sources/7.json        the source files version 7 was built from
 pipelines/<slug>/<table>/v7/<hive segments>/<mapping>.parquet
 ```
+
+An [incremental run](/reference/pipeline-config#incremental-runs) rewrites only
+the partitions that get new rows, so a manifest can list files from several
+`v<n>/` prefixes.
 
 A single-object write is atomic, so a dashboard query either sees the whole
 previous version or the whole new one, never a half-written table. A run that
@@ -54,8 +59,9 @@ fails partway publishes nothing, leaving the previous version live and the
 orphaned files for the vacuum to collect.
 
 The last 10 versions of each table are retained. On each publish the worker
-deletes manifests past that window and any object no retained manifest
-references, which bounds storage and collects a dead run's leftovers.
+deletes manifests and source records past that window and any object no
+retained manifest references, which bounds storage and collects a dead run's
+leftovers.
 
 ### Time travel
 

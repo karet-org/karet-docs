@@ -89,6 +89,15 @@ for this walkthrough pick **Spending Tracker** instead. That provisions:
 - A dashboard with KPI tiles, a category doughnut, a monthly-trend line,
   a top-merchants bar, and a transactions table.
 
+The new pipeline appears on the home page:
+
+![The Pipelines page with two pipelines and the New pipeline button](/images/pipelines.png)
+
+Open it to see its **Graph**: the source on the left, the dimensions below it,
+the mapping in the middle, and the analytic table on the right.
+
+![The Graph page for a Spending Tracker pipeline](/images/graph.png)
+
 ## 6. Drop in some data
 
 Upload one or more CSVs to the source prefix:
@@ -102,6 +111,9 @@ If you've enabled the [auto-run webhook](./webhooks), the upload triggers
 a pipeline run automatically (with a 5-second debounce so a batch upload
 becomes one job). Otherwise click **Run Pipeline** on the **Jobs** page.
 
+After the first run, a run reads only the files added since the last one;
+see [incremental runs](/reference/pipeline-config#incremental-runs).
+
 Until that first run finishes, the **Data** page says the table has no data yet.
 A table only exists in the warehouse once a run has published it, so there is
 nothing to query before then.
@@ -110,6 +122,8 @@ nothing to query before then.
 
 Navigate to **Dashboards → Spending Overview**. KPIs, charts, and the
 transactions table all populate from the Parquet output.
+
+![The Spending Overview dashboard after three months of data](/images/dashboard.png)
 
 ## What's next?
 
