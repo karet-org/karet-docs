@@ -7,16 +7,6 @@ CSVs) into a single job.
 The receiver lives in the worker and the debounce state lives in
 Valkey. The web service is not involved.
 
-::: warning Known issue: pipelines created on web 0.10 or later
-The worker finds which pipelines an upload belongs to by reading
-`pipelines/<slug>/pipeline.json` from the pipelines bucket. Since 0.10
-configs live in Postgres, and new pipelines have no such file, so
-uploads do not start their runs. Config edits made since 0.10 are not
-seen by the router either. Until the worker reads configs from
-Postgres, start runs with **Run Pipeline** or the
-[jobs API](./authentication#automation-and-ci).
-:::
-
 ## How it works
 
 ```mermaid

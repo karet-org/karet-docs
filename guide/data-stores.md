@@ -69,17 +69,3 @@ docker compose exec -T postgres pg_dump -U karet karet | gzip > /backup/karet.sq
 Losing Postgres loses accounts, config history and job records even if every
 Parquet file survives, so restore the dump somewhere once and check that it
 works.
-
-## Coming from a pre-Postgres instance
-
-One script moves what was in the buckets:
-
-```sh
-DRY_RUN=1 node scripts/import-s3-to-postgres.mjs   # report only
-node scripts/import-s3-to-postgres.mjs             # every pipeline
-node scripts/manage-users.mjs import-s3            # accounts
-```
-
-All three are idempotent and insert only what is missing. Nothing in S3 is deleted:
-verify the import, then remove the old `pipeline.json`, `_history/` and `jobs/`
-objects yourself.

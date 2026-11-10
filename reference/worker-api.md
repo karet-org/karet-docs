@@ -48,9 +48,9 @@ Accepts the standard S3 event envelope (`Records[].eventName`,
 `Records[].s3.bucket.name`, `Records[].s3.object.key`). Only
 `s3:ObjectCreated:*` events for the lake bucket are acted on. Each key
 extends the debounce window of every pipeline with a source
-`path_prefix` that the key starts with. The worker finds those prefixes
-by reading the `pipelines/<slug>/pipeline.json` objects in the pipelines
-bucket, cached for a short time.
+`path_prefix` that the key starts with. The worker reads those prefixes
+from each pipeline's live config in Postgres, and caches them for 30
+seconds.
 
 ## Job lifecycle (queue, not HTTP)
 
@@ -81,7 +81,6 @@ All required unless noted; the worker fails fast if any is missing.
 
 | Variable | Purpose |
 |----------|---------|
-| `S3_BUCKET_PIPELINES` | Bucket the upload router reads `pipeline.json` files from (default `karet-pipelines`). |
 | `S3_BUCKET_LAKE` | Bucket for raw source files (default `karet-lake`). |
 | `S3_BUCKET_WAREHOUSE` | Bucket for Parquet output (default `karet-warehouse`). |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | S3 credentials. |

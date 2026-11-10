@@ -6,7 +6,7 @@ Run the full Karet stack on your machine.
 This guide runs the compose file from a checkout of the `karet` repo, which
 also gives you the `hash-password` script. The [self-hosting guide](./self-hosting)
 runs the same prebuilt images without a checkout, and covers configuration and
-upgrades.
+updates.
 :::
 
 ## Prerequisites
@@ -117,8 +117,7 @@ aws --endpoint-url=http://localhost:9000 \
 
 Then click **Run Pipeline** on the **Jobs** page. [Auto-runs](./webhooks) can
 start a run on upload instead, with a 5-second debounce so a batch upload
-becomes one job, but they need extra setup and do not yet work for pipelines
-created on web 0.10 or later.
+becomes one job; they need a one-time setup.
 
 After the first run, a run reads only the files added since the last one;
 see [incremental runs](/reference/pipeline-config#incremental-runs).

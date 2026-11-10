@@ -92,7 +92,7 @@ policies per bucket.
 
 | Bucket | Env var | Holds |
 |--------|---------|-------|
-| `karet-pipelines` | `S3_BUCKET_PIPELINES` | Dashboards, saved queries, thumbnails, workspace settings, and the `pipeline.json` files of pipelines created before 0.10. |
+| `karet-pipelines` | `S3_BUCKET_PIPELINES` | Dashboards, saved queries, thumbnails, workspace settings. |
 | `karet-lake` | `S3_BUCKET_LAKE` | Raw source files you upload: CSV, or JSON lines. |
 | `karet-warehouse` | `S3_BUCKET_WAREHOUSE` | Query-ready partitioned Parquet. |
 

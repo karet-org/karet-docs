@@ -88,16 +88,3 @@ already used.
 Restoring a table's data and restoring its config are separate actions. Rolling
 back a bad config does not rewrite the data that config produced; re-run the
 pipeline, or roll the table back too.
-
-## Upgrading a pre-manifest instance
-
-Instances that ran before this layout have unversioned Parquet sitting directly
-under the table prefix, which readers no longer glob. One script describes what
-is already there as version 1, so nothing moves:
-
-```sh
-DRY_RUN=1 node scripts/adopt-warehouse-manifests.mjs   # report only
-node scripts/adopt-warehouse-manifests.mjs             # every pipeline
-```
-
-It skips tables that already have a pointer, so it is safe to re-run.

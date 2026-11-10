@@ -259,7 +259,7 @@ your network is shared.
 | `DUCKDB_THREADS` | `2` | Thread cap for that session. |
 | `DATABASE_POOL_MAX` | web: `8` app + `4` auth; worker: `4` | Postgres connections per pool. On the web service it caps both of its pools. |
 
-## Upgrading
+## Updating
 
 ```sh
 docker compose pull
@@ -268,72 +268,10 @@ docker compose up -d
 
 The `postgres-data`, `rustfs-data` and `valkey-data` volumes persist across
 restarts and pulls, so your accounts, pipelines, dashboards, job history and
-queued jobs all survive upgrades. `postgres-data` is the one to back up: it holds
-everything that is not a file. The web image runs `scripts/db-setup.mjs` before
+queued jobs all survive an update. See [backups](./data-stores#backups) for what
+to copy. The web image runs `scripts/db-setup.mjs` before
 it serves, so the schema migrates itself; several containers starting together is
 safe, because the first takes an advisory lock and the rest find nothing to do.
-
-::: warning Upgrading from ≤ 0.9.x
-0.10.0 moves the control plane into Postgres: pipelines, config versions, job
-history and accounts are rows now, not objects in the pipelines bucket. Nothing
-is deleted from S3 by the upgrade, so it is reversible by putting the old images
-back.
-
-1. **Back up the buckets.** They are the only copy of your pipelines until the
-   import has run:
-   ```sh
-   docker run --rm -v karet_rustfs-data:/src:ro -v "$PWD":/dst alpine:3 \
-     tar -C /src -czf /dst/karet-buckets.tar.gz karet-pipelines karet-lake karet-warehouse
-   ```
-2. **Add Postgres and the new variables.** Take the `postgres` service from the
-   compose file above, add `POSTGRES_PASSWORD` to `.env`, and give both `web` and
-   `worker` the same `DATABASE_URL`. If you set `BETTER_AUTH_SECRET` or
-   `BETTER_AUTH_URL` by hand, they are `KARET_SESSION_SECRET` and
-   `KARET_PUBLIC_URL`; `S3_CONSOLE_URL` is gone.
-3. **Start the database and apply the schema.**
-   ```sh
-   docker compose pull
-   docker compose up -d postgres
-   docker compose run --rm --no-deps web node scripts/db-setup.mjs
-   ```
-   That also creates the bootstrap admin from `KARET_ADMIN_PASSWORD_HASH`, so
-   your existing password still works. Other people are accounts you create in
-   Settings afterwards.
-4. **Import what is in S3.** Report first, then do it:
-   ```sh
-   docker compose run --rm --no-deps -e DRY_RUN=1 web node scripts/import-s3-to-postgres.mjs
-   docker compose run --rm --no-deps web node scripts/import-s3-to-postgres.mjs
-   ```
-   Each `pipeline.json` becomes config version 1 with its `_history/*.json`
-   folded in ahead of it, and each `jobs/*.json` becomes a job row. Dashboards,
-   saved queries, lake files and Parquet stay where they are.
-5. **Adopt tables written before manifests**, or they read as empty:
-   ```sh
-   docker compose run --rm --no-deps web node scripts/adopt-warehouse-manifests.mjs
-   ```
-6. **Bring the rest up:** `docker compose up -d`.
-7. **Leave `pipelines/<slug>/pipeline.json` in place.** The worker builds its
-   upload-routing table by listing those objects, so deleting them stops
-   upload-triggered runs. Manual runs are unaffected.
-
-Both scripts are idempotent and only insert what is missing, so a partial run can
-be repeated.
-:::
-
-::: warning Upgrading from ≤ 0.1.x
-0.2.0 changed the architecture: jobs now travel over a Valkey queue, the
-webhook receiver moved from the web service to the worker, and the admin
-password moved from S3 to `KARET_ADMIN_PASSWORD_HASH`. To migrate:
-
-1. Replace your compose file with the one above (adds `valkey`, new env).
-2. Generate `KARET_WORKER_TOKEN` and `KARET_WEBHOOK_SECRET`.
-3. Carry your password over: copy `password_hash` out of
-   `_auth/admin.json` in the pipelines bucket into
-   `KARET_ADMIN_PASSWORD_HASH` (double every `$` for compose), then
-   delete the S3 object. Or just hash a fresh password.
-4. Re-point the RustFS webhook at the worker and re-apply the bucket
-   notification rule ([Auto-runs](./webhooks#setup)).
-:::
 
 To wipe state and start over:
 

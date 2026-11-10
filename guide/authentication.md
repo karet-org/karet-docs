@@ -71,10 +71,6 @@ node scripts/manage-users.mjs set-password erin
 node scripts/manage-users.mjs remove erin
 ```
 
-If you are coming from a pre-Postgres instance, a one-off
-`node scripts/manage-users.mjs import-s3` brings accounts over from the old
-`_auth/users.json`.
-
 ## Your own account
 
 Everyone, whatever their role, owns two things about their account on
@@ -132,8 +128,7 @@ pipeline.
 it at their own role, or `members`, meaning it is hidden from everyone except the
 people listed on it. **New pipelines are `members`**: a pipeline usually holds
 somebody's data before its author has decided who should see it, so access is
-granted rather than assumed. Pipelines created before per-pipeline access kept
-the visibility they had.
+granted rather than assumed.
 
 **Grants.** A membership row replaces a person's instance role for one pipeline,
 and it can widen (a viewer who edits one pipeline) or narrow (an editor who may
