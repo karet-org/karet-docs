@@ -1,7 +1,7 @@
 # Auto-runs (webhooks)
 
-Uploading a source file to a pipeline's raw prefix automatically triggers a
-pipeline run. A debouncer coalesces a batch upload (say, 12 monthly
+Uploading a source file to a pipeline's source prefix triggers a
+pipeline run. A debouncer combines a batch upload (say, 12 monthly
 CSVs) into a single job.
 
 The receiver lives in the worker and the debounce state lives in
@@ -31,14 +31,14 @@ sequenceDiagram
   (`RUSTFS_NOTIFY_WEBHOOK_AUTH_TOKEN_PRIMARY` sends it as a bearer
   token). The secret is required; the endpoint fails closed without
   it.
-- The worker filters to object-created events in the lake bucket,
-  extracts the pipeline slug from each `pipelines/<slug>/...` key, and
-  extends that slug's debounce window in Valkey.
+- The worker filters to object-created events in the lake bucket and
+  extends the debounce window, in Valkey, of every pipeline with a source
+  prefix the uploaded key starts with.
 - The debounce fires after **5 seconds of quiet**, or after **30 seconds
   since the first event in the batch**, whichever comes first, then
   enqueues a job like any manual run.
-- Auto-runs show up in the **Jobs** page tagged with a small blue `auto`
-  chip. Manual runs are unchanged.
+- Auto-runs show `webhook` in the **Trigger** column of the **Jobs** page;
+  runs started from the UI or the API show `manual`.
 
 ## Setup
 
@@ -78,6 +78,11 @@ aws --endpoint-url http://localhost:9000 --region us-east-1 \
 
 The rule persists in bucket metadata across restarts.
 
+The filter only passes `.csv` files under `pipelines/`. For NDJSON
+sources, or sources whose `path_prefix` is outside `pipelines/`, add a
+rule for each prefix and suffix you use; the worker ignores keys that
+match no pipeline.
+
 ::: warning RustFS version quirk
 Some RustFS versions (observed on `1.0.0-rc.3`) load bucket notification
 rules only at startup. A freshly applied rule does nothing until you
@@ -99,8 +104,8 @@ aws --endpoint-url=http://localhost:9000 \
   s3 cp test.csv s3://karet-lake/pipelines/<slug>/transactions/
 ```
 
-Within ~5 seconds the worker logs `debounced upload event`, and a new
-job appears on the Jobs page with an `auto` chip.
+The worker logs `debounced upload event for <slug>` straight away, and
+about 5 seconds later a job with trigger `webhook` appears on the Jobs page.
 
 ## Scaling out
 

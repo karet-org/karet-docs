@@ -14,8 +14,10 @@ npm run preview      # preview the built site
 ## Layout
 
 - `index.md`: landing page (hero + feature grid).
-- `guide/`: narrative docs (getting started, architecture, templates,
-  webhooks, auth, AWS deploy).
+- `guide/`: narrative docs (getting started, self-hosting, architecture,
+  templates, webhooks, auth, versions, data stores).
+- `public/images/`: screenshots, taken at 1280x800 with a device scale
+  factor of 2.
 - `reference/`: schema and HTTP API reference (pipeline config,
   dashboard config, worker API, web API).
 - `.vitepress/config.ts`: site config (nav, sidebar, search).

@@ -1,9 +1,9 @@
 # Web HTTP API
 
 The web service (`karet`) hosts both the UI and the JSON API the UI
-talks to. The `/api/*` routes exist solely to back the browser UI and
-require a session cookie, they are not a stable public surface and
-not intended for scripting.
+talks to. The `/api/*` routes exist to back the browser UI and are not a
+stable public surface. They take a session cookie, or the worker token as
+a bearer token for [machine callers](/guide/authentication#automation-and-ci).
 
 Every `/api/*` route enforces auth except the explicitly-public ones
 below.
@@ -27,11 +27,11 @@ there is no setup or password-change endpoint. See
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/pipelines` | List pipeline slugs. |
-| `POST /api/pipelines` | Body `{ slug, template }`. Provisions a new pipeline from a template. |
+| `GET /api/pipelines` | `{ pipelines: [{ id, name }] }`, the pipelines the caller can see. |
+| `POST /api/pipelines` | Body `{ name, template }`. Provisions a new pipeline from a template and returns `{ ok, pipeline, name }`, where `pipeline` is the generated id (`p-<time>-<random>`). |
 | `POST /api/pipelines/import` | Multipart upload of a `.zip` exported from another instance. |
-| `DELETE /api/pipelines/[slug]` | Delete every object under `pipelines/<slug>/` across all three buckets. |
-| `PATCH /api/pipelines/[slug]` | Body `{ newSlug }`. Renames by copy-then-delete across all three buckets. |
+| `DELETE /api/pipelines/[slug]` | Delete the pipeline: its registry row, config versions and job rows, and every object under `pipelines/<slug>/` in the pipelines and warehouse buckets. Lake files are kept, since other pipelines may read them. |
+| `PATCH /api/pipelines/[slug]` | Body `{ name }`. Changes the display name; the id never changes. |
 
 ## Your own account
 
@@ -66,7 +66,7 @@ reset does not, and signs the caller out. All `422`.
 | `GET /api/settings` | Workspace UI settings (workspace name, starred pipelines). |
 | `PUT /api/settings` | Admin. Replaces the settings document, input sanitized. The workspace name is an instance setting, not a personal one. |
 | `GET /api/lake?prefix=` | One level of the lake bucket: folders and files. |
-| `PUT /api/lake?key=` | Upload one file (validated key, 100 MB cap). CSVs under a pipeline prefix trigger a debounced run. |
+| `PUT /api/lake?key=` | Upload one file (validated key, 100 MB cap). With [auto-runs](/guide/webhooks) set up, the upload can trigger a debounced run. |
 | `POST /api/lake` | Body `{ from, to }`. Move an object (copy then delete). |
 | `DELETE /api/lake?key=` | Delete an object. |
 | `GET /api/lake/object?key=` | Download an object as an attachment. |
@@ -94,15 +94,18 @@ reset does not, and signs the caller out. All `422`.
 | `POST /api/p/[pipeline]/dashboards/[name]/publish` | Validate a draft (schema, bindings, SQL) and publish it. |
 | `POST /api/p/[pipeline]/dashboards/[name]/data` | Run all panel queries with filter params; returns per-panel results. |
 | `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, file count, live version. `version: 0` means no run has published the table yet, so it is not queryable. |
-| `GET /api/p/[pipeline]/tables/[table]/rows` | The table's rows, read from the warehouse with DuckDB `read_parquet`. |
-| `POST /api/p/[pipeline]/query` | Body `{ sql }`. Runs SQL against the pipeline's warehouse tables (each exposed as a DuckDB relation over its Parquet). Returns `{ columns, rows }`. |
+| `GET /api/p/[pipeline]/tables/[table]/rows` | The table's rows, read from the files the live manifest lists. `?version=` reads a retained version instead. |
+| `GET /api/p/[pipeline]/tables/[table]/versions` | `{ versions }`: the retained table versions, newest first, with file count, bytes and which is live. |
+| `POST /api/p/[pipeline]/tables/[table]/versions/[version]/restore` | Publish that version's file list as a new version. `404` if it is not retained. |
+| `POST /api/p/[pipeline]/query` | Body `{ sql, versions? }`. Runs SQL against the pipeline's warehouse tables, each exposed as a DuckDB relation. `versions` maps a table to a retained version to read instead of the live one. Returns `{ columns, rows }`. |
 | `GET /api/p/[pipeline]/queries` | List saved queries (`{ queries: SavedQuery[] }`). |
 | `POST /api/p/[pipeline]/queries` | Body `{ name, sql }`. Save a query under a unique name. `409` if the name is taken. |
-| `GET /api/p/[pipeline]/queries/[id]` | Fetch a single saved query. |
-| `DELETE /api/p/[pipeline]/queries/[id]` | Delete a saved query. |
-| `GET /api/p/[pipeline]/jobs` | Job history (S3) merged with live queue state from Valkey. Active jobs carry a `progress` object (stage, file/mapping counters). Statuses: `queued`, `running`, `completed`, `failed`. |
-| `POST /api/p/[pipeline]/jobs?clean=true` | Trigger a manual run. Enqueues onto the job stream and returns the initial `queued` record immediately; a worker claims and executes it. |
-| `GET /api/p/[pipeline]/export` | Stream a `.zip` of every object under the slug (across all three buckets). |
+| `GET /api/p/[pipeline]/queries/[name]` | Fetch a single saved query. |
+| `DELETE /api/p/[pipeline]/queries/[name]` | Delete a saved query. |
+| `GET /api/p/[pipeline]/jobs` | Job history from Postgres merged with live queue state from Valkey. Active jobs carry a `progress` object (stage, file/mapping counters). Statuses: `queued`, `running`, `completed`, `failed`. |
+| `POST /api/p/[pipeline]/jobs` | Trigger a manual run. Enqueues onto the job stream and returns the initial `queued` record immediately; a worker claims and executes it. Runs are never clean: the route ignores a `clean` parameter. |
+| `GET /api/p/[pipeline]/jobs/events` | Server-sent events: the id of each job whose live state changed. The Jobs page uses it to refresh. `503 too_many_streams` past 8 open streams per web process. |
+| `GET /api/p/[pipeline]/export` | Stream a `.zip` of the pipeline: its live config as `pipeline.json`, plus every object under the slug in the pipelines bucket (dashboards, saved queries). Lake files and warehouse tables are not included. |
 
 ## Webhooks
 
@@ -112,13 +115,14 @@ the web service. See [Auto-runs](/guide/webhooks) and the
 
 ## Auth shape
 
-The middleware (`middleware.ts`) checks only that a session cookie is present.
+The middleware (`middleware.ts`) checks only that a session cookie or the service
+token is present.
 Every route then resolves the caller against the pipeline it addresses, because a
 membership or ownership can change the answer and the edge cannot read the
 database. See [per-pipeline access](/guide/authentication#per-pipeline-access).
 
 Only `/api/auth/*` bypasses the middleware; everything else requires a
-valid session cookie.
+valid session cookie or the service token.
 
 ## Error shape
 
@@ -132,13 +136,13 @@ Common codes:
 
 | Code | Meaning |
 |------|---------|
-| `unauthorized` | Missing/invalid session cookie. |
+| `unauthorized` | Missing or invalid session cookie or token. |
 | `bucket_not_found` | An S3 bucket doesn't exist. Most-common cause: an `S3_BUCKET_*` mistype. |
 | `s3_error` | Catch-all for everything else from the S3 SDK. |
-| `pipeline_config_not_found` | The slug exists but its `pipeline.json` is missing. |
+| `pipeline_config_not_found` | `404`. The pipeline has no published config. |
 | `dashboard_not_found` | The slug exists but no dashboard at the given name. |
-| `invalid_slug` | The slug failed sanitization. |
-| `already_exists` | Trying to create or rename onto an existing slug. |
+| `invalid_slug` | The pipeline id failed sanitization. |
+| `already_exists` | `409`. An account with that username exists. |
 | `not_found` | Also returned instead of `403` for a members-only pipeline the caller is not on, so its existence is not leaked. |
 | `stale_config` | `412`. The config moved on since the editor loaded it. |
 | `owner_access_is_permanent` | `422`. The owner cannot be removed from the member list or set below admin; transfer the pipeline instead. |

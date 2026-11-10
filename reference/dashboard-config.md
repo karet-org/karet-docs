@@ -86,7 +86,7 @@ exactly one column.
 | `line`           | `x`, `y`                       | `series`                                  |
 | `doughnut`       | `label`, `value`               | `emit`                                    |
 | `table`          | (none: renders all columns)    | `columns`, `page_size`                    |
-| `sankey`         | `source`, `target`, `value`    |                                           |
+| `sankey`         | `source`, `target`, `value`, `source_layer`, `target_layer` |                  |
 | `choropleth_map` | `region`, `value`              |                                           |
 | `symbol_map`     | `lat`, `lon`, `value`          | `label`, `max_radius`                     |
 | `summary`        | (none: row/column counts)      |                                           |
@@ -129,20 +129,28 @@ each; queries stay long-format:
 ### Sankey
 
 One row per weighted edge. Multi-stage flows are unions whose stages
-share node names; self-links and cycle-closing links are skipped:
+share node names. `source_layer` and `target_layer` name numeric columns
+that place each end of the edge in a column of the diagram, left to
+right; a node takes the layer of the first row that mentions it. Rows
+with a value of zero or less, or a null layer, are skipped, and so are
+self-links and links that would close a cycle:
 
 ```yaml
 - kind: sankey
   title: Cash flow
   query: |
-    SELECT account AS src, 'Budget' AS dst, sum(abs(amount)) AS total
+    SELECT account AS src, 'Budget' AS dst, sum(abs(amount)) AS total,
+           0 AS src_layer, 1 AS dst_layer
     FROM transactions WHERE category = 'INCOME' GROUP BY 1
     UNION ALL
-    SELECT 'Budget' AS src, category AS dst, sum(abs(amount)) AS total
+    SELECT 'Budget' AS src, category AS dst, sum(abs(amount)) AS total,
+           1 AS src_layer, 2 AS dst_layer
     FROM transactions WHERE category != 'INCOME' GROUP BY 2
   source: src
   target: dst
   value: total
+  source_layer: src_layer
+  target_layer: dst_layer
 ```
 
 ### Click-to-filter (emit)

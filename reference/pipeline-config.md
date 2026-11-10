@@ -1,7 +1,9 @@
 # Pipeline config
 
 A pipeline's behavior (what it ingests, how rows are transformed, what
-it writes out) is fully described by `pipelines/<slug>/pipeline.json`.
+it writes out) is fully described by one JSON document, its config. Each
+save stores a new version in Postgres (see [config history](/guide/versions#config-history));
+an exported pipeline carries it as `pipeline.json`.
 
 ```ts
 interface PipelineConfig {
@@ -15,9 +17,7 @@ interface PipelineConfig {
 ```
 
 The worker rejects unknown fields on `Mapping`, and `dimensions` is
-required, so a config written for an older version needs migrating rather
-than loading as-is. Configs still carrying `lookup_mappings` are from
-before Dimensions replaced Lookups; see [Dimensions](#dimensions).
+required.
 
 ## Source containers
 
@@ -44,9 +44,9 @@ interface ColumnSchema {
 
 `path_prefix` is an absolute key prefix in the lake bucket, so a source
 can read any folder in the data lake, including folders shared with other
-pipelines. An upload triggers a run of every pipeline with a matching
-source prefix. Within one pipeline, no source's prefix may be nested
-under another's.
+pipelines. With [auto-runs](/guide/webhooks) set up, an upload triggers a
+run of every pipeline with a matching source prefix. Within one pipeline,
+no source's prefix may be nested under another's.
 
 ### CSV sources
 
@@ -135,25 +135,6 @@ Inline rows suit small hand-edited tables. File-backed rows read a CSV
 from the lake, for large or externally maintained tables: `key` names the
 CSV's key column, `values` the columns to expose, and `priority_column`
 an optional priority. Dimensions are capped at 1,000,000 rows.
-
-### Migrating from Lookups
-
-Dimensions replaced the older `lookup_mappings`/`lookup_ref` in web
-0.9.0 / worker 0.5.0, and the old shape no longer parses. The mapping is
-mechanical:
-
-| Lookup | Dimension |
-|---|---|
-| `lookup_mappings` | `dimensions` |
-| `rows[].input_patterns` | `rows.rows[].patterns` |
-| `rows[].output` | `rows.rows[].values[0]` |
-| `catch_all.output` | `on_miss: { literal: ... }` |
-| `children` | flat ids; promote each child to its own dimension |
-| `{ kind: "lookup_ref", lookup_id }` | `{ kind: "dim_ref", dim_id }` |
-
-The web app upgrades configs of the old shape as it reads them, and
-`scripts/migrate-lookups-to-dimensions.mjs` rewrites stored configs in
-place.
 
 ## Mappings
 
@@ -279,9 +260,37 @@ listed as `partition_keys: ["year", "month"]`.
 evaluates (and assertions pass), rows sharing a key tuple collapse to
 one; the first in ingest order survives, and the dropped count is
 reported on the job record as `rows_deduped`. Overlapping re-exports
-collapse naturally because every run re-reads the whole source prefix.
+collapse, whether the run is a full one or an incremental one (below).
 Two different mappings writing one table are not deduplicated against
 each other.
+
+## Incremental runs
+
+A run reads only the source files a mapping has not read before, as long as
+nothing else that decides the mapping's output has changed. It ingests the new
+files, drops any new row whose dedup key is already in the table, and rewrites
+only the partitions the remaining rows fall into. The result is the same table
+a full run would produce.
+
+![An incremental run on the Jobs page: one file processed, one partition written](/images/jobs-incremental.png)
+
+A mapping runs in full, re-reading its whole source prefix, when:
+
+- the mapping, its source container, its analytic table, a dimension, or a
+  file-backed dimension's CSV has changed;
+- a file it already read was deleted or replaced;
+- the table has `dedup_keys` and a new file's key sorts before a file already
+  read. Dedup keeps the first row in ingest order, which is key order, so
+  appending matches a full run only when new files sort last. Name uploads so
+  they sort by time, such as `2026-06.csv` or `access_<epoch>.csv`;
+- it is the first run since the table was created or restored to an earlier
+  version;
+- the job asked for a clean run.
+
+What each mapping has read is stored next to the table's manifest; see
+[data versions](/guide/versions#data-versions). A run with no new files writes
+nothing. On the job record, `files_processed` counts only the files the run
+read, and `rows_deduped` counts only the duplicates it found among them.
 
 ## Worked example
 

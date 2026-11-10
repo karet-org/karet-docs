@@ -33,10 +33,9 @@ One writer per table, so there is never a question of who is authoritative.
 
 ## Runs are pinned to a config version
 
-A run used to read whatever the config head said at the moment it started, so
-saving partway through a run left the result unattributable. Now the queue
-message carries a config version id: the run uses exactly that version, and its
-job row records which one. Saving during a run cannot change what the run did.
+The queue message for a run carries a config version id. The run uses exactly
+that version, and its job row records which one, so saving the config during a
+run cannot change what the run does.
 
 Runs triggered by an upload are the exception, because an S3 event knows a prefix
 rather than a version, so those resolve whichever version is live when execution
@@ -55,10 +54,11 @@ back with the password the environment says it has.
 
 ## Backups
 
-Two things to copy now, not one:
+Back up Postgres and the buckets:
 
 ```sh
 # The buckets: lake, warehouse, dashboards, queries.
+aws s3 sync s3://karet-lake /backup/lake
 aws s3 sync s3://karet-warehouse /backup/warehouse
 aws s3 sync s3://karet-pipelines /backup/pipelines
 
@@ -66,20 +66,6 @@ aws s3 sync s3://karet-pipelines /backup/pipelines
 docker compose exec -T postgres pg_dump -U karet karet | gzip > /backup/karet.sql.gz
 ```
 
-Losing Postgres now loses accounts, history and job records even if every byte of
-Parquet survives, so restore the dump somewhere once and check it works. An
-untested backup is not a backup.
-
-## Coming from a pre-Postgres instance
-
-One script moves what was in the buckets:
-
-```sh
-DRY_RUN=1 node scripts/import-s3-to-postgres.mjs   # report only
-node scripts/import-s3-to-postgres.mjs             # every pipeline
-node scripts/manage-users.mjs import-s3            # accounts
-```
-
-Both are idempotent and insert only what is missing. Nothing in S3 is deleted:
-verify the import, then remove the old `pipeline.json`, `_history/` and `jobs/`
-objects yourself.
+Losing Postgres loses accounts, config history and job records even if every
+Parquet file survives, so restore the dump somewhere once and check that it
+works.

@@ -34,11 +34,10 @@ replace their password.
 Everyone else is a row in Postgres. There is no signup form: an admin does this on
 **Settings → People**, which lists who exists, adds an account from a username,
 password and role, changes a role, resets a password, and deletes an account. There
-can be as many admins as you like, and a team of any size wants at least two, since
-nobody can change their own role.
+can be any number of admins. Keep at least two, since nobody can change their own
+role.
 
-Two things the People screen will not do, because they would undo themselves or lock you
-out mid-request:
+The People screen refuses two changes:
 
 - The bootstrap admin cannot be deleted, demoted, or given a new password here. The
   environment sets its role and password on every start, so the change would appear
@@ -55,8 +54,8 @@ A reset sets a password and ends that account's sessions. Karet sends no mail, s
 there is no self-service "forgot password": an admin sets a new one and tells them.
 
 Deleting an account ends its sessions and drops its per-pipeline grants. Pipelines
-it owned stay, without an owner, and any admin can hand them on; the confirmation
-names them so nobody deletes a colleague and wonders where the work went.
+it owned stay, without an owner, and any admin can transfer them. The confirmation
+lists those pipelines before you delete.
 
 ### From a terminal
 
@@ -71,10 +70,6 @@ node scripts/manage-users.mjs set-role erin admin
 node scripts/manage-users.mjs set-password erin
 node scripts/manage-users.mjs remove erin
 ```
-
-If you are coming from a pre-Postgres instance, a one-off
-`node scripts/manage-users.mjs import-s3` brings accounts over from the old
-`_auth/users.json`.
 
 ## Your own account
 
@@ -126,16 +121,14 @@ session at once.
 
 ## Per-pipeline access
 
-Roles above are instance-wide, which is the right default for a small team
-sharing everything and the wrong one as soon as a pipeline exists that some of
-those people should not read. Two things narrow it.
+The roles above are instance-wide. Two settings change who can use a single
+pipeline.
 
 **Visibility.** A pipeline is either `instance`, meaning everyone signed in sees
 it at their own role, or `members`, meaning it is hidden from everyone except the
 people listed on it. **New pipelines are `members`**: a pipeline usually holds
 somebody's data before its author has decided who should see it, so access is
-granted rather than assumed. Existing pipelines were left as they were when this
-arrived.
+granted rather than assumed.
 
 **Grants.** A membership row replaces a person's instance role for one pipeline,
 and it can widen (a viewer who edits one pipeline) or narrow (an editor who may
@@ -144,19 +137,17 @@ only read this one).
 ### Owners
 
 Whoever creates a pipeline owns it, recorded as `pipelines.owner_id`, and an
-owner is admin on their own pipeline whatever the member list says. That is why
-access does not come from a grant: a list that can lock a person out of the thing
-they built is a way to lose it. `created_by` stays beside it as a record of who
-made the pipeline, while `owner_id` answers who has it now.
+owner is admin on their own pipeline whatever the member list says, so editing
+the member list cannot lock the owner out. `created_by` records who made the
+pipeline; `owner_id` records who owns it now.
 
-Ownership can be handed over, which is what keeps permanent access from meaning
-forever. Transferring is the owner's decision or an instance admin's, not merely
-an admin-on-this-pipeline decision, since otherwise an editor granted admin on
-one pipeline could take ownership and make their own access permanent. Only the
-owner changes: no grant is written for the new owner, and the previous owner's
-grant, if they have one, becomes ordinary and revocable rather than vanishing
-under them. Deleting an account leaves its pipelines ownerless rather than
-guessing an heir, and an instance admin picks who takes them.
+Ownership can be transferred, by the owner or an instance admin. Being admin on
+the pipeline is not enough, since otherwise an editor granted admin on one
+pipeline could take ownership and make their own access permanent. Only the owner
+changes: no grant is written for the new owner, and the previous owner's grant, if
+they have one, stays as an ordinary grant that can be revoked. Deleting an account
+leaves its pipelines without an owner, and an instance admin chooses who takes
+them.
 
 Attempting to remove the owner from the member list, or to set them below admin,
 returns `422 owner_access_is_permanent` rather than appearing to work.
@@ -165,8 +156,8 @@ returns `422 owner_access_is_permanent` rather than appearing to work.
 
 For a given person and pipeline, in order:
 
-1. An **instance admin** is admin everywhere. An access list that can lock the
-   operator out is a way to lose a pipeline.
+1. An **instance admin** is admin everywhere, so no access list can lock the
+   operator out.
 2. The **owner** is admin on that pipeline.
 3. A **membership row**, if there is one. It is the more specific statement, so it
    wins over the instance role in both directions.
@@ -198,17 +189,13 @@ worker's own API, so this is not a separate privilege to manage.
 
 ## Login throttling
 
-scrypt verification costs ~128 MiB and ~0.5 s per attempt, so an unthrottled
-login endpoint is a denial-of-service lever as well as a brute-force one.
-Better-auth's own limiter handles it: after three failed attempts the endpoint
+scrypt verification costs about 128 MiB and 0.5 s per attempt, so without a
+limit the login endpoint could be used to exhaust the server as well as to guess
+passwords. Better-auth's limiter handles it: after three failed attempts the endpoint
 answers `429` with `{"message": "Too many requests. Please try again later."}`
 and an `x-retry-after` header in seconds. The window is short, ten seconds by
 default, and it counts requests rather than failures, so a correct password
 during the cooldown is refused too.
-
-Karet carried its own token-bucket for this before better-auth arrived. It was
-deleted rather than left sitting unused, so this section describes the limiter
-that runs.
 
 ## What's stored where
 

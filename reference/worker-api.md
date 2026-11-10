@@ -46,8 +46,11 @@ RustFS object-created notifications; drives [auto-runs](/guide/webhooks).
 
 Accepts the standard S3 event envelope (`Records[].eventName`,
 `Records[].s3.bucket.name`, `Records[].s3.object.key`). Only
-`s3:ObjectCreated:*` events for the lake bucket are acted on; each
-matching `pipelines/<slug>/...` key extends that slug's debounce window.
+`s3:ObjectCreated:*` events for the lake bucket are acted on. Each key
+extends the debounce window of every pipeline with a source
+`path_prefix` that the key starts with. The worker reads those prefixes
+from each pipeline's live config in Postgres, and caches them for 30
+seconds.
 
 ## Job lifecycle (queue, not HTTP)
 
@@ -57,9 +60,11 @@ trigger, enqueued_at }`. For each claimed job the worker:
 1. Takes the per-pipeline run lock (at most one run per pipeline,
    cluster-wide; lock-busy jobs defer and retry).
 2. Validates the config; an invalid config fails the job without retry.
-3. With `clean_run: true`, deletes existing table output first so
-   removed source files don't leave stale partitions. The default is
-   incremental: re-runs overwrite partitions in place (idempotent).
+3. Lists each source prefix and decides per mapping whether to run in
+   full or [incrementally](./pipeline-config#incremental-runs), then
+   downloads only the files that needs. `clean_run: true` runs every
+   mapping in full and starts the new table version from an empty file
+   list, so removed source files don't leave stale partitions.
 4. Streams progress into `karet:jobs:live:<id>` (stage, file and
    mapping counters, partitions written).
 5. Publishes the table version, updates the job's row in Postgres with its
@@ -76,12 +81,13 @@ All required unless noted; the worker fails fast if any is missing.
 
 | Variable | Purpose |
 |----------|---------|
-| `S3_BUCKET_PIPELINES` | Bucket for pipeline configs (default `karet-pipelines`). |
 | `S3_BUCKET_LAKE` | Bucket for raw source files (default `karet-lake`). |
 | `S3_BUCKET_WAREHOUSE` | Bucket for Parquet output (default `karet-warehouse`). |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | S3 credentials. |
 | `AWS_ENDPOINT_URL` | S3 endpoint URL (e.g. `http://rustfs:9000` for local dev). |
 | `REDIS_URL` | Valkey/Redis connection string (e.g. `redis://valkey:6379`). |
+| `DATABASE_URL` | Postgres connection string. The worker reads config versions and writes job rows. |
+| `DATABASE_POOL_MAX` | Optional. Postgres connections the worker opens (default `4`). |
 | `KARET_WORKER_TOKEN` | Bearer token for `POST /config/validate`; the web service sends the same value. |
 | `KARET_WEBHOOK_SECRET` | Shared secret for `POST /events/s3`. |
 | `WORKER_CONCURRENCY` | Optional. Jobs processed concurrently per worker (default `1`). |
@@ -93,5 +99,9 @@ All required unless noted; the worker fails fast if any is missing.
 
 Run more workers (`docker compose up --scale worker=N` or more
 replicas): the consumer group distributes jobs, and per-pipeline locks
-keep each pipeline serialized. Each run currently materializes its CSVs
-in memory, so size worker memory to your largest pipeline's raw data.
+keep each pipeline serialized. A full run holds every source file of the
+pipeline in memory at once, and the parsed rows on top of that, so size
+worker memory to several times your largest pipeline's raw data. An
+[incremental run](./pipeline-config#incremental-runs) holds only the new
+files and the partitions they touch. Polars uses every CPU unless
+`POLARS_MAX_THREADS` limits it.

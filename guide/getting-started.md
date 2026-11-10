@@ -3,15 +3,18 @@
 Run the full Karet stack on your machine.
 
 ::: tip Just want to self-host?
-This guide builds from source so you can poke at the code. If you
-just want a running instance, the [self-hosting guide](./self-hosting)
-uses prebuilt images from GHCR and skips the source checkout.
+This guide runs the compose file from a checkout of the `karet` repo, which
+also gives you the `hash-password` script. The [self-hosting guide](./self-hosting)
+runs the same prebuilt images without a checkout, and covers configuration and
+updates.
 :::
 
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) with the Compose plugin (`docker compose`).
-- About 1 GB of disk for the bundled S3 emulator and clean Parquet output.
+- [Node.js](https://nodejs.org/) for the password hash script.
+- About 3 GB of disk for the images (about 720 MB to download), plus the data
+  you load.
 
 ## 1. Clone and configure
 
@@ -81,26 +84,43 @@ grant someone access on the pipeline's **Access** page. See
 From the home page, click **+ New pipeline**. **Blank** is selected by default;
 for this walkthrough pick **Spending Tracker** instead. That provisions:
 
+- Two months of sample transactions at `pipelines/<slug>/transactions/seed.csv`.
+
 - A source container at `pipelines/<slug>/transactions/` that expects
   `date, description, amount, account` CSVs.
-- A dimension that tags each row with a category by keyword match.
-- An analytic table written to `pipelines/<slug>/transactions/` as
-  partitioned Parquet.
-- A dashboard with KPI tiles, a category doughnut, a monthly-trend line,
-  a top-merchants bar, and a transactions table.
+- Two dimensions: one tags each row with a category by keyword match, the
+  other maps merchant names to a canonical spelling.
+- An analytic table written to `pipelines/<slug>/transactions/` in the
+  warehouse bucket as Parquet, partitioned by year and month.
+- Three dashboards. **Spending Overview** has KPI tiles, a category
+  doughnut, a monthly bar, a top-merchants bar and a transactions table;
+  **Cash Flow** and **Net Income** cover money in and out.
 
-## 6. Drop in some data
+The new pipeline appears on the home page:
 
-Upload one or more CSVs to the source prefix:
+![The Pipelines page with two pipelines and the New pipeline button](/images/pipelines.png)
+
+Open it to see its **Graph**: the source on the left, the dimensions below it,
+the mapping in the middle, and the analytic table on the right.
+
+![The Graph page for a Spending Tracker pipeline](/images/graph.png)
+
+## 6. Run it, and add data
+
+The sample data is enough for a first run. To add your own, upload CSVs with
+the same columns to the source prefix, from the **Data lake** page or the CLI:
 
 ```sh
 aws --endpoint-url=http://localhost:9000 \
   s3 cp my-jan.csv s3://karet-lake/pipelines/<slug>/transactions/
 ```
 
-If you've enabled the [auto-run webhook](./webhooks), the upload triggers
-a pipeline run automatically (with a 5-second debounce so a batch upload
-becomes one job). Otherwise click **Run Pipeline** on the **Jobs** page.
+Then click **Run Pipeline** on the **Jobs** page. [Auto-runs](./webhooks) can
+start a run on upload instead, with a 5-second debounce so a batch upload
+becomes one job; they need a one-time setup.
+
+After the first run, a run reads only the files added since the last one;
+see [incremental runs](/reference/pipeline-config#incremental-runs).
 
 Until that first run finishes, the **Data** page says the table has no data yet.
 A table only exists in the warehouse once a run has published it, so there is
@@ -110,6 +130,8 @@ nothing to query before then.
 
 Navigate to **Dashboards → Spending Overview**. KPIs, charts, and the
 transactions table all populate from the Parquet output.
+
+![The Spending Overview dashboard after three months of data](/images/dashboard.png)
 
 ## What's next?
 

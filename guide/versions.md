@@ -20,15 +20,15 @@ starts.
 The **History** page lists versions newest first with the author, and shows the
 diff between the version you are inspecting and the one that is live, the way you
 would read a `git diff`. Layout is ignored when deciding whether anything changed:
-dragging a node around the graph is recorded, but it is not a change to the
-pipeline, and counting it would bury the real edits.
+moving a node on the graph is saved, but the diff leaves it out so it does not
+hide real edits.
 
 Restoring writes the chosen config forward as a new version rather than winding
 history back, so the trail stays append-only and a restore you regret is just
 another restore. The restored config is re-validated first, since an old version
 can predate a schema change.
 
-The last 100 versions per pipeline are kept.
+Every version is kept until the pipeline is deleted.
 
 ### Two editors, one pipeline
 
@@ -45,8 +45,13 @@ version prefix, and the run publishes by replacing one small pointer object:
 ```text
 pipelines/<slug>/<table>/_current.json          {"version": 7}
 pipelines/<slug>/<table>/_manifests/7.json      the file list for version 7
+pipelines/<slug>/<table>/_sources/7.json        the source files version 7 was built from
 pipelines/<slug>/<table>/v7/<hive segments>/<mapping>.parquet
 ```
+
+An [incremental run](/reference/pipeline-config#incremental-runs) rewrites only
+the partitions that get new rows, so a manifest can list files from several
+`v<n>/` prefixes.
 
 A single-object write is atomic, so a dashboard query either sees the whole
 previous version or the whole new one, never a half-written table. A run that
@@ -54,8 +59,9 @@ fails partway publishes nothing, leaving the previous version live and the
 orphaned files for the vacuum to collect.
 
 The last 10 versions of each table are retained. On each publish the worker
-deletes manifests past that window and any object no retained manifest
-references, which bounds storage and collects a dead run's leftovers.
+deletes manifests and source records past that window and any object no
+retained manifest references, which bounds storage and collects a dead run's
+leftovers.
 
 ### Time travel
 
@@ -82,16 +88,3 @@ already used.
 Restoring a table's data and restoring its config are separate actions. Rolling
 back a bad config does not rewrite the data that config produced; re-run the
 pipeline, or roll the table back too.
-
-## Upgrading a pre-manifest instance
-
-Instances that ran before this layout have unversioned Parquet sitting directly
-under the table prefix, which readers no longer glob. One script describes what
-is already there as version 1, so nothing moves:
-
-```sh
-DRY_RUN=1 node scripts/adopt-warehouse-manifests.mjs   # report only
-node scripts/adopt-warehouse-manifests.mjs             # every pipeline
-```
-
-It skips tables that already have a pointer, so it is safe to re-run.
