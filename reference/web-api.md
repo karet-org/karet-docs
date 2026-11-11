@@ -93,11 +93,11 @@ reset does not, and signs the caller out. All `422`.
 | `DELETE /api/p/[pipeline]/dashboards/[name]` | Delete draft and published objects. |
 | `POST /api/p/[pipeline]/dashboards/[name]/publish` | Validate a draft (schema, bindings, SQL) and publish it. |
 | `POST /api/p/[pipeline]/dashboards/[name]/data` | Run all panel queries with filter params; returns per-panel results. |
-| `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, file count, live version. `version: 0` means no run has published the table yet, so it is not queryable. |
-| `GET /api/p/[pipeline]/tables/[table]/rows` | The table's rows, read from the files the live manifest lists. `?version=` reads a retained version instead. |
+| `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, partition and dedup keys, file count, live version. `version: 0` means no run has published the table yet, so it is not queryable. |
+| `GET /api/p/[pipeline]/tables/[table]/rows` | One page of the table: `{ columns, rows, total, offset, limit }`, where `columns` carries DuckDB types and `total` counts the rows matching the filter. `?where=` is a SQL condition, `?sort=` a column with `?dir=asc` or `desc` (nulls last), `?offset=` and `?limit=` (default 100, at most 500). `?version=` reads a retained version instead of the live one. |
 | `GET /api/p/[pipeline]/tables/[table]/versions` | `{ versions }`: the retained table versions, newest first, with file count, bytes and which is live. |
 | `POST /api/p/[pipeline]/tables/[table]/versions/[version]/restore` | Publish that version's file list as a new version. `404` if it is not retained. |
-| `POST /api/p/[pipeline]/query` | Body `{ sql, versions? }`. Runs SQL against the pipeline's warehouse tables, each exposed as a DuckDB relation. `versions` maps a table to a retained version to read instead of the live one. Returns `{ columns, rows }`. |
+| `POST /api/p/[pipeline]/query` | Body `{ sql, versions?, limit? }`. Runs SQL against the pipeline's warehouse tables, each exposed as a DuckDB relation. `versions` maps a table to a retained version to read instead of the live one. `limit` (at most 10,000) caps the rows returned. Returns `{ columns, rows, truncated }`, where `truncated` says whether there were more rows than `limit`. |
 | `GET /api/p/[pipeline]/queries` | List saved queries (`{ queries: SavedQuery[] }`). |
 | `POST /api/p/[pipeline]/queries` | Body `{ name, sql }`. Save a query under a unique name. `409` if the name is taken. |
 | `GET /api/p/[pipeline]/queries/[name]` | Fetch a single saved query. |
