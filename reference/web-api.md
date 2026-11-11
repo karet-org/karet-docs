@@ -93,7 +93,7 @@ reset does not, and signs the caller out. All `422`.
 | `DELETE /api/p/[pipeline]/dashboards/[name]` | Delete draft and published objects. |
 | `POST /api/p/[pipeline]/dashboards/[name]/publish` | Validate a draft (schema, bindings, SQL) and publish it. |
 | `POST /api/p/[pipeline]/dashboards/[name]/data` | Run all panel queries with filter params; returns per-panel results. |
-| `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, partition and dedup keys, file count, live version. `version: 0` means no run has published the table yet, so it is not queryable. |
+| `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, partition and dedup keys, file count, live version, row count (`rowCount`, null when it cannot be read) and when the live version was published (`publishedAt`). `version: 0` means no run has published the table yet, so it is not queryable. |
 | `GET /api/p/[pipeline]/tables/[table]/rows` | One page of the table: `{ columns, rows, total, offset, limit }`, where `columns` carries DuckDB types and `total` counts the rows matching the filter. `?where=` is a SQL condition, `?sort=` a column with `?dir=asc` or `desc` (nulls last), `?offset=` and `?limit=` (default 100, at most 500). `?version=` reads a retained version instead of the live one. |
 | `GET /api/p/[pipeline]/tables/[table]/versions` | `{ versions }`: the retained table versions, newest first, with file count, bytes and which is live. |
 | `POST /api/p/[pipeline]/tables/[table]/versions/[version]/restore` | Publish that version's file list as a new version. `404` if it is not retained. |
