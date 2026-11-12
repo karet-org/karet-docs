@@ -139,4 +139,5 @@ transactions table all populate from the Parquet output.
 - [Pipeline config](/reference/pipeline-config): the JSON shape that drives ingest.
 - [Dashboard config](/reference/dashboard-config): panel kinds, layout, cross-filters.
 - [Auto-runs](./webhooks): wire RustFS uploads to pipeline runs.
+- [Search](./search): find events by words and field values.
 - [Automating uploads](./automating-uploads): ship new data on a schedule.
