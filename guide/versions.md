@@ -65,7 +65,7 @@ leftovers.
 
 ### Time travel
 
-The **Versions** view in a table's panel on the Data page lists what is
+On the Data page, a table's **Properties** tab lists the versions that are
 retained, with sizes and which version is live. Any of them can be read
 directly:
 
