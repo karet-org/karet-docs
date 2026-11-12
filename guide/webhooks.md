@@ -4,6 +4,8 @@ Uploading a source file to a pipeline's source prefix triggers a
 pipeline run. A debouncer combines a batch upload (say, 12 monthly
 CSVs) into a single job.
 
+To upload new data on a schedule, see [automating uploads](./automating-uploads).
+
 The receiver lives in the worker and the debounce state lives in
 Valkey. The web service is not involved.
 
