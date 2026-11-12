@@ -34,6 +34,7 @@ export default withMermaid(defineConfig({
             { text: "Architecture", link: "/guide/architecture" },
             { text: "Templates", link: "/guide/templates" },
             { text: "Auto-runs (webhooks)", link: "/guide/webhooks" },
+            { text: "Automating uploads", link: "/guide/automating-uploads" },
             { text: "Authentication and roles", link: "/guide/authentication" },
             { text: "Versions and history", link: "/guide/versions" },
             { text: "Where data lives", link: "/guide/data-stores" },
