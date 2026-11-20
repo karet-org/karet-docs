@@ -136,6 +136,9 @@ services:
       KARET_WORKER_TOKEN: ${KARET_WORKER_TOKEN:?set KARET_WORKER_TOKEN (e.g. openssl rand -hex 32)}
       REDIS_URL: redis://valkey:6379
       DATABASE_URL: ${DATABASE_URL:-postgres://karet:${POSTGRES_PASSWORD}@postgres:5432/karet}
+      # The web app reads the DuckLake catalog as this role; db-setup creates
+      # it with this password.
+      KARET_LAKE_READER_PASSWORD: ${KARET_LAKE_READER_PASSWORD:?set KARET_LAKE_READER_PASSWORD (e.g. openssl rand -hex 24)}
       KARET_PUBLIC_URL: ${KARET_PUBLIC_URL:-http://localhost:3000}
     depends_on:
       rustfs:
@@ -158,8 +161,8 @@ reachable over the compose network.
 
 ## 2. Generate the secrets
 
-Karet refuses to start without five secrets. Four are random strings; the
-fifth is your admin password, hashed:
+Karet refuses to start without six secrets. Five are random strings; the
+sixth is your admin password, hashed:
 
 ```sh
 cat > .env <<EOF
@@ -167,6 +170,7 @@ POSTGRES_PASSWORD=$(openssl rand -hex 24)
 KARET_SESSION_SECRET=$(openssl rand -base64 48)
 KARET_WORKER_TOKEN=$(openssl rand -hex 32)
 KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)
+KARET_LAKE_READER_PASSWORD=$(openssl rand -hex 24)
 EOF
 ```
 
@@ -250,7 +254,8 @@ your network is shared.
 | `KARET_SESSION_SECRET` | *(required)* | Signs session cookies. `openssl rand -base64 48`. |
 | `KARET_ADMIN_PASSWORD_HASH` | *(required)* | scrypt hash of the bootstrap admin's password, re-asserted on every start (`npm run hash-password`). |
 | `KARET_ADMIN_USERNAME` | `admin` | Username of that bootstrap admin. |
-| `KARET_WORKER_TOKEN` | *(required)* | Bearer token the web service sends on worker `/config/validate` calls, and that [machine callers](./authentication#automation-and-ci) send to the web API. |
+| `KARET_LAKE_READER_PASSWORD` | *(required)* | Password of `karet_lake_reader`, the read-only Postgres role the web service reads the DuckLake catalog as. Startup creates the role. |
+| `KARET_WORKER_TOKEN` | *(required)* | Bearer token the web service sends on worker `/config/validate` and `/tables/restore` calls, and that [machine callers](./authentication#automation-and-ci) send to the web API. |
 | `KARET_WEBHOOK_SECRET` | *(required)* | Shared secret RustFS sends with upload events; verified by the worker. |
 | `KARET_PUBLIC_URL` | `http://localhost:3000` | The URL people reach this instance on. An `https:` value turns on secure cookies, so set it when you put Karet behind a proxy. |
 | `S3_FORCE_PATH_STYLE` | unset | `true` for S3 implementations without virtual-host addressing, RustFS included. |

@@ -3,13 +3,13 @@
 Karet keeps two kinds of state, in two places, on purpose.
 
 **Postgres** holds the control plane: accounts and sessions, the pipeline
-registry, config versions, and job history. These need constraints, indexes and
+registry, config versions, and job history. A second database on the same
+server, `karet_lake`, holds the DuckLake catalog of the analytic tables. These need constraints, indexes and
 transactions: a unique username, one live config version per pipeline, and "how
 often did runs fail last month" as a query rather than a scan.
 
 **S3** holds the data plane and the documents you edit: raw files in the lake,
-Parquet in the warehouse with the manifests that describe it, dashboard YAML and
-saved queries. These are large, or they are text you want to export, diff and
+the Parquet files of the analytic tables, dashboard YAML and saved queries. These are large, or they are text you want to export, diff and
 keep in git.
 
 | | Postgres | S3 |
@@ -20,7 +20,8 @@ keep in git.
 | Job history | ● | |
 | Dashboards, saved queries | | ● |
 | Lake files | | ● |
-| Warehouse Parquet + manifests | | ● |
+| Table catalog (DuckLake) | ● | |
+| Table Parquet files | | ● |
 
 ## Who writes what
 
