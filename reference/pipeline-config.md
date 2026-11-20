@@ -287,7 +287,8 @@ A mapping runs in full, re-reading its whole source prefix, when:
   version;
 - the job asked for a clean run.
 
-What each mapping has read is stored next to the table's manifest; see
+What each mapping has read is stored with the table's rows, in the same
+transaction; see
 [data versions](/guide/versions#data-versions). A run with no new files writes
 nothing. On the job record, `files_processed` counts only the files the run
 read, and `rows_deduped` counts only the duplicates it found among them.

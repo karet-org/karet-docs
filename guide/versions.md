@@ -39,29 +39,26 @@ whatever the other person did.
 
 ## Data versions
 
-A run never writes over what readers are scanning. Output lands under a new
-version prefix, and the run publishes by replacing one small pointer object:
+The analytic tables are [DuckLake](https://ducklake.select) tables. The catalog
+is a separate Postgres database, `karet_lake`, and the Parquet files are in the
+warehouse bucket under `lake/`. Each pipeline is a DuckLake schema named after
+its slug, and each table is a DuckLake table.
 
-```text
-pipelines/<slug>/<table>/_current.json          {"version": 7}
-pipelines/<slug>/<table>/_manifests/7.json      the file list for version 7
-pipelines/<slug>/<table>/_sources/7.json        the source files version 7 was built from
-pipelines/<slug>/<table>/v7/<hive segments>/<mapping>.parquet
-```
+A run writes each table in one transaction, so a dashboard query sees either the
+whole previous version or the whole new one, never a half-written table. A run
+that fails partway commits nothing for that table and leaves the previous
+version live. A table version is a DuckLake snapshot that changed the table's
+rows, and its number is the snapshot id, so the numbers of one table are not
+consecutive.
 
-An [incremental run](/reference/pipeline-config#incremental-runs) rewrites only
-the partitions that get new rows, so a manifest can list files from several
-`v<n>/` prefixes.
+Each table has one extra column, `_karet_mapping`, naming the mapping that wrote
+the row. A mapping's full run replaces only its own rows, and an
+[incremental run](/reference/pipeline-config#incremental-runs) only adds rows.
+Queries from the web app do not show the column.
 
-A single-object write is atomic, so a dashboard query either sees the whole
-previous version or the whole new one, never a half-written table. A run that
-fails partway publishes nothing, leaving the previous version live and the
-orphaned files for the vacuum to collect.
-
-The last 10 versions of each table are retained. On each publish the worker
-deletes manifests and source records past that window and any object no
-retained manifest references, which bounds storage and collects a dead run's
-leftovers.
+The last 10 versions of each table are retained. After each commit the worker
+merges the table's small files, expires older snapshots, and deletes data files
+no retained snapshot reads once they are an hour old.
 
 ### Time travel
 
@@ -80,10 +77,11 @@ curl -X POST ".../api/p/<slug>/query" -H 'Content-Type: application/json' \
 
 ### Rolling back
 
-Restoring a version makes it live again for every reader at once. No Parquet is
-copied: the new version names the same objects, and, like config restore, the
-pointer only ever climbs, so the next run cannot collide with a number it
-already used.
+Restoring a version makes it live again for every reader at once. The worker
+copies that version's rows into a new version, so a restore can itself be
+undone, and the next run of each mapping is a full run. The worker holds the
+pipeline's run lock while it restores, so a restore answers `409` while a run
+is in progress.
 
 Restoring a table's data and restoring its config are separate actions. Rolling
 back a bad config does not rewrite the data that config produced; re-run the

@@ -36,6 +36,19 @@ Used by the graph editor's "Validate" button.
 `{ "ok": false, "errors": [{ "kind", "message", "path" }] }` where
 `path` is a JSON Pointer to the offending config node.
 
+### `POST /tables/restore`
+
+Make a retained version of a table current, as a new version. The web app's
+restore endpoint calls this.
+
+**Auth**: `Authorization: Bearer <KARET_WORKER_TOKEN>`.
+
+**Request body**: `{ "pipeline": "<slug>", "table": "<table id>", "version": 17 }`.
+
+**Response**: `200` with `{ "ok": true, "version": <new version> }`; `404`
+when the version is not retained; `409` while a run holds the pipeline's
+lock.
+
 ### `POST /events/s3`
 
 RustFS object-created notifications; drives [auto-runs](/guide/webhooks).
@@ -63,12 +76,13 @@ trigger, enqueued_at }`. For each claimed job the worker:
 3. Lists each source prefix and decides per mapping whether to run in
    full or [incrementally](./pipeline-config#incremental-runs), then
    downloads only the files that needs. `clean_run: true` runs every
-   mapping in full and starts the new table version from an empty file
-   list, so removed source files don't leave stale partitions.
+   mapping in full and removes every stored row first, so removed source
+   files and removed mappings leave nothing behind.
 4. Streams progress into `karet:jobs:live:<id>` (stage, file and
    mapping counters, partitions written).
-5. Publishes the table version, updates the job's row in Postgres with its
-   outcome, then acks.
+5. Commits each changed table to DuckLake in one transaction, with each
+   mapping's incremental-run record, then merges small files and expires old
+   snapshots. Updates the job's row in Postgres with its outcome, then acks.
 
 Transient failures (e.g. S3 unreachable) retry with exponential backoff
 up to `MAX_ATTEMPTS`. Jobs whose worker died are reclaimed by another
@@ -82,13 +96,13 @@ All required unless noted; the worker fails fast if any is missing.
 | Variable | Purpose |
 |----------|---------|
 | `S3_BUCKET_LAKE` | Bucket for raw source files (default `karet-lake`). |
-| `S3_BUCKET_WAREHOUSE` | Bucket for Parquet output (default `karet-warehouse`). |
+| `S3_BUCKET_WAREHOUSE` | Bucket for the DuckLake data files, under `lake/` (default `karet-warehouse`). |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | S3 credentials. |
 | `AWS_ENDPOINT_URL` | S3 endpoint URL (e.g. `http://rustfs:9000` for local dev). |
 | `REDIS_URL` | Valkey/Redis connection string (e.g. `redis://valkey:6379`). |
-| `DATABASE_URL` | Postgres connection string. The worker reads config versions and writes job rows. |
+| `DATABASE_URL` | Postgres connection string. The worker reads config versions and writes job rows, and writes the DuckLake catalog in the `LAKE_DATABASE` database (default `karet_lake`) on the same server with the same credentials. |
 | `DATABASE_POOL_MAX` | Optional. Postgres connections the worker opens (default `4`). |
-| `KARET_WORKER_TOKEN` | Bearer token for `POST /config/validate`; the web service sends the same value. |
+| `KARET_WORKER_TOKEN` | Bearer token for `POST /config/validate` and `POST /tables/restore`; the web service sends the same value. |
 | `KARET_WEBHOOK_SECRET` | Shared secret for `POST /events/s3`. |
 | `WORKER_CONCURRENCY` | Optional. Jobs processed concurrently per worker (default `1`). |
 | `MAX_ATTEMPTS` | Optional. Delivery attempts before a job is terminally failed (default `3`). |
