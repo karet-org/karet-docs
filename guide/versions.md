@@ -56,7 +56,10 @@ the row. A mapping's full run replaces only its own rows, and an
 [incremental run](/reference/pipeline-config#incremental-runs) only adds rows.
 Queries from the web app do not show the column.
 
-The last 10 versions of each table are retained. After each commit the worker
+The last 10 versions of each table are retained. The files of a deleted
+pipeline, or of a table a clean run recreated, are deleted once no retained
+version of any table still reads them, which can take up to 10 more runs of
+the other tables. After each commit the worker
 merges the table's small files, expires older snapshots, and deletes data files
 no retained snapshot reads once they are an hour old.
 
@@ -74,6 +77,11 @@ curl ".../api/p/<slug>/tables/<table>/rows?version=17"
 curl -X POST ".../api/p/<slug>/query" -H 'Content-Type: application/json' \
   -d '{"sql": "SELECT count(*) FROM requests", "versions": {"requests": 17}}'
 ```
+
+SQL you write cannot use `AT` or the DuckLake functions (`table_changes`,
+`snapshots`, `ducklake_*`) itself. Older snapshots still hold the tables of
+deleted pipelines until they expire, so reading versions goes through the
+`versions` option, which only names this pipeline's tables.
 
 ### Rolling back
 
