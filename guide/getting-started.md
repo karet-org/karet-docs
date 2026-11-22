@@ -27,6 +27,7 @@ POSTGRES_PASSWORD=$(openssl rand -hex 24)
 KARET_SESSION_SECRET=$(openssl rand -base64 48)
 KARET_WORKER_TOKEN=$(openssl rand -hex 32)
 KARET_WEBHOOK_SECRET=$(openssl rand -hex 32)
+KARET_LAKE_READER_PASSWORD=$(openssl rand -hex 24)
 EOF
 ```
 

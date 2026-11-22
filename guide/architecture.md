@@ -44,15 +44,15 @@ before the web publishes it. Everything else between them goes through a store.
 
 | Store | Holds | Written by | Read by |
 |-------|-------|-----------|---------|
-| **postgres** | accounts, sessions, pipeline registry, config versions, job rows | web (everything but job rows, and it owns migrations), worker (job rows) | both |
+| **postgres** | accounts, sessions, pipeline registry, config versions, job rows; the DuckLake catalog in the `karet_lake` database | web (everything but job rows and the catalog, and it owns migrations), worker (job rows, the catalog) | both; the web reads the catalog as the read-only `karet_lake_reader` role |
 | **valkey** | job stream, live job state, per-pipeline run locks, upload debounce | web (enqueue), worker (claim, progress, locks, its own debounced enqueues) | both |
 | **karet-lake** | raw CSV and NDJSON you upload | web (the Data lake browser uploads, moves, deletes) | worker |
-| **karet-warehouse** | partitioned Parquet, per-table manifests, the `_current.json` pointer | worker (a run publishes), web (a restore publishes) | both |
+| **karet-warehouse** | the Parquet files of the DuckLake tables, under `lake/` | worker | both |
 | **karet-pipelines** | dashboard YAML, saved queries, thumbnails, workspace settings | web | web |
 
-In Postgres each table has exactly one writer. The warehouse has two publishers,
-and only the worker takes the per-pipeline lock, so a table restore that happens
-during a run can pick the same version number as the run.
+In Postgres each table has exactly one writer. Only the worker writes the
+analytic tables: a restore from the web goes to the worker, which takes the same
+per-pipeline lock as a run.
 
 ## The job queue
 
@@ -120,14 +120,11 @@ karet-pipelines  pipelines/<slug>/dashboards/*.yaml       # one per dashboard
 
 karet-lake       pipelines/<slug>/transactions/*.csv     # raw inputs you upload
 
-karet-warehouse  pipelines/<slug>/<table>/_current.json   # which version is live
-                 pipelines/<slug>/<table>/_manifests/<n>.json
-                 pipelines/<slug>/<table>/_sources/<n>.json  # files version n read
-                 pipelines/<slug>/<table>/v<n>/year=YYYY/month=MM/<mapping>.parquet
+karet-warehouse  lake/<slug>/<table>/...parquet           # DuckLake data files
 ```
 
-The config itself, the pipeline registry and job history are rows in Postgres, not
-objects here. See [where data lives](./data-stores).
+The config itself, the pipeline registry, job history and the table catalog are
+rows in Postgres, not objects here. See [where data lives](./data-stores).
 
 ## Trust boundaries
 

@@ -30,7 +30,7 @@ there is no setup or password-change endpoint. See
 | `GET /api/pipelines` | `{ pipelines: [{ id, name }] }`, the pipelines the caller can see. |
 | `POST /api/pipelines` | Body `{ name, template }`. Provisions a new pipeline from a template and returns `{ ok, pipeline, name }`, where `pipeline` is the generated id (`p-<time>-<random>`). |
 | `POST /api/pipelines/import` | Multipart upload of a `.zip` exported from another instance. |
-| `DELETE /api/pipelines/[slug]` | Delete the pipeline: its registry row, config versions and job rows, and every object under `pipelines/<slug>/` in the pipelines and warehouse buckets. Lake files are kept, since other pipelines may read them. |
+| `DELETE /api/pipelines/[slug]` | Delete the pipeline: first its tables in DuckLake, through the worker, then its registry row, config versions and job rows, and every object under `pipelines/<slug>/` in the pipelines and warehouse buckets. Nothing is deleted when the worker cannot drop the tables; `409` while the pipeline runs. Lake files are kept, since other pipelines may read them. |
 | `PATCH /api/pipelines/[slug]` | Body `{ name }`. Changes the display name; the id never changes. |
 
 ## Your own account
@@ -96,7 +96,7 @@ reset does not, and signs the caller out. All `422`.
 | `GET /api/p/[pipeline]/tables` | Per-table metadata: name, schema, partition and dedup keys, file count, live version, row count (`rowCount`, null when it cannot be read) and when the live version was published (`publishedAt`). `version: 0` means no run has published the table yet, so it is not queryable. |
 | `GET /api/p/[pipeline]/tables/[table]/rows` | One page of the table: `{ columns, rows, total, offset, limit }`, where `columns` carries DuckDB types and `total` counts the rows matching the filter. `?where=` is a SQL condition, `?sort=` a column with `?dir=asc` or `desc` (nulls last), `?offset=` and `?limit=` (default 100, at most 500). `?version=` reads a retained version instead of the live one. |
 | `GET /api/p/[pipeline]/tables/[table]/versions` | `{ versions }`: the retained table versions, newest first, with file count, bytes and which is live. |
-| `POST /api/p/[pipeline]/tables/[table]/versions/[version]/restore` | Publish that version's file list as a new version. `404` if it is not retained. |
+| `POST /api/p/[pipeline]/tables/[table]/versions/[version]/restore` | Copy that version's rows into a new version, through the worker. `404` if it is not retained, `409` while the pipeline runs. |
 | `POST /api/p/[pipeline]/query` | Body `{ sql, versions?, limit? }`. Runs SQL against the pipeline's warehouse tables, each exposed as a DuckDB relation. `versions` maps a table to a retained version to read instead of the live one. `limit` (at most 10,000) caps the rows returned. Returns `{ columns, rows, truncated }`, where `truncated` says whether there were more rows than `limit`. |
 | `GET /api/p/[pipeline]/queries` | List saved queries (`{ queries: SavedQuery[] }`). |
 | `POST /api/p/[pipeline]/queries` | Body `{ name, sql }`. Save a query under a unique name. `409` if the name is taken. |
