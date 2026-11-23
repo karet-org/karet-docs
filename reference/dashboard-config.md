@@ -77,6 +77,17 @@ Parameters do not require a filter: an undeclared `$param` binds NULL
 `emit`. `dropdown` filters require `options_sql`, which must return
 exactly one column.
 
+A `date_range` filter can set `default_days: N`. The dashboard then opens
+with the start date N days before today in the viewer's time zone, and no
+end date. Clearing the filter shows all dates.
+
+```yaml
+  - name: period
+    kind: date_range
+    label: Date range
+    default_days: 30
+```
+
 ## Panel kinds and bindings
 
 | kind             | required bindings              | optional                                  |
