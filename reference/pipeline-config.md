@@ -31,6 +31,7 @@ interface SourceContainer {
   format?: "csv" | "ndjson";  // default "csv"
   schema: ColumnSchema[];
   record_filter?: AstNode;    // ndjson only, see below
+  retention_days?: number;    // delete raw files this many days after upload
 }
 
 interface ColumnSchema {
@@ -81,6 +82,21 @@ source can take only the ones it understands:
 
 Epoch timestamps, which JSON logs almost always carry and `parse_date`
 cannot read, are handled by [`from_unix`](#expressions).
+
+### Raw file retention
+
+`retention_days` deletes a source's raw files from the lake that many days
+after upload. A file is deleted only once every mapping that reads the source
+has loaded it under its current config, so a mapping that has not run yet, or
+whose config changed since, keeps the file until its next run. The rows a file
+produced stay in the tables. Deleted files are remembered, so uploading the
+same file again does not load its rows twice. Unset keeps files forever; the
+minimum is 1 day.
+
+Changing `retention_days` does not cause a full run. A later full run, such as
+one after a mapping edit, re-reads only the files still in the lake, so rows
+from deleted files are lost then. Set retention only on sources whose mappings
+are settled, or keep a copy of the raw files elsewhere.
 
 ## Dimensions
 
@@ -236,6 +252,7 @@ interface AnalyticTable {
   schema: ColumnSchema[];    // the columns the dashboard / table view will see
   partition_keys?: string[]; // hive path segments, in order; max 2, no floats
   dedup_keys?: string[];     // row identity; duplicate tuples collapse to one
+  retention?: { column: string; days: number }; // delete rows older than days
 }
 ```
 
@@ -263,6 +280,14 @@ reported on the job record as `rows_deduped`. Overlapping re-exports
 collapse, whether the run is a full one or an incremental one (below).
 Two different mappings writing one table are not deduplicated against
 each other.
+
+### Row retention
+
+`retention` deletes rows whose `column` is more than `days` days before
+today, each time the table is written. The column must be a `date` column and
+`days` at least 1. Older table versions still hold the deleted rows until they
+expire (see [data versions](/guide/versions#data-versions)). Changing
+`retention` does not cause a full run.
 
 ## Incremental runs
 

@@ -63,6 +63,12 @@ the other tables. After each commit the worker
 merges the table's small files, expires older snapshots, and deletes data files
 no retained snapshot reads once they are an hour old.
 
+These versions are the only history the lake keeps of a table. Rows deleted
+by [row retention](/reference/pipeline-config#row-retention) can be restored
+from a version until it expires, and raw files deleted by
+[raw file retention](/reference/pipeline-config#raw-file-retention) cannot be
+restored at all.
+
 ### Time travel
 
 On the Data page, a table's **Properties** tab lists the versions that are
